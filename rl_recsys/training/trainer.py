@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+import numpy as np
+
+from rl_recsys.agents.base import Agent
+from rl_recsys.config import ExperimentConfig
+from rl_recsys.environments.base import RecEnv
+from rl_recsys.training.metrics import ctr, mrr, ndcg_at_k
+
+
+def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, float]]:
+    """Main training loop.
+
+    Returns a list of per-episode metric dicts.
+    """
+    rng = np.random.default_rng(cfg.train.seed)
+    history: list[dict[str, float]] = []
+
+    for ep in range(cfg.train.num_episodes):
+        obs = env.reset(seed=int(rng.integers(0, 2**31)))
+        episode_rewards: list[float] = []
+        episode_clicks: list[np.ndarray] = []
+
+        # single-step episodes (re-rank a fresh candidate set each episode)
+        slate = agent.select_slate(obs)
+        step = env.step(slate)
+
+        agent.update(obs, slate, step.reward, step.clicks, step.obs)
+
+        episode_rewards.append(step.reward)
+        episode_clicks.append(step.clicks)
+
+        all_clicks = np.concatenate(episode_clicks)
+        metrics = {
+            "episode": float(ep),
+            "reward": float(np.sum(episode_rewards)),
+            "ndcg": ndcg_at_k(all_clicks),
+            "mrr": mrr(all_clicks),
+            "ctr": ctr(all_clicks),
+        }
+        history.append(metrics)
+
+        if ep % cfg.train.log_every == 0:
+            print(
+                f"[ep {ep:4d}] reward={metrics['reward']:.2f}  "
+                f"ndcg={metrics['ndcg']:.3f}  ctr={metrics['ctr']:.3f}"
+            )
+
+    return history
