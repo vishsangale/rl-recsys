@@ -13,3 +13,7 @@ venv/
 checkpoints/
 media/
 .pytest_cache/
+
+# Data
+data/
+!rl_recsys/data/pipelines/
