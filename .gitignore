@@ -16,6 +16,8 @@ outputs/
 multirun/
 /wandb/
 /mlruns/
+/mlflow.db
+/mlflow.db-*
 media/
 .pytest_cache/
 

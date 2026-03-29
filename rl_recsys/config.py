@@ -54,7 +54,7 @@ class WandbConfig:
 @dataclass
 class MlflowConfig:
     enabled: bool = False
-    tracking_uri: str = "mlruns"
+    tracking_uri: str = "sqlite:///mlflow.db"
     experiment_name: str = "rl-recsys"
     run_name: str | None = None
     artifact_path: str = "artifacts"
