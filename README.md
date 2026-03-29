@@ -22,6 +22,9 @@ python experiments/run_synthetic.py --cfg job --resolve
 # Override values from the CLI
 python experiments/run_synthetic.py train.num_episodes=25 env.slate_size=5 train.seed=7
 
+# Enable offline W&B logging
+python experiments/run_synthetic.py wandb.enabled=true wandb.mode=offline
+
 # Run tests
 pytest tests/
 ```

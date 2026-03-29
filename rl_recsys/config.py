@@ -39,10 +39,23 @@ class TrainConfig:
 
 
 @dataclass
+class WandbConfig:
+    enabled: bool = False
+    project: str = "rl-recsys"
+    entity: str | None = None
+    mode: str = "offline"
+    group: str | None = None
+    job_type: str = "train"
+    dir: str = "wandb"
+    tags: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ExperimentConfig:
     env: EnvConfig = field(default_factory=EnvConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
+    wandb: WandbConfig = field(default_factory=WandbConfig)
 
 
 def to_experiment_config(

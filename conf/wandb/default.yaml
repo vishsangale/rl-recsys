@@ -1,0 +1,8 @@
+enabled: false
+project: rl-recsys
+entity: null
+mode: offline
+group: null
+job_type: train
+dir: wandb
+tags: []
