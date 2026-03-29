@@ -41,6 +41,9 @@ python /home/vishsangale/workspace/latent-superpowers/core/wandb/scripts/check_w
 
 # Run tests
 pytest tests/
+
+# Validate the repo surface
+python tools/validate_repo.py
 ```
 
 ## Architecture

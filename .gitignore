@@ -20,6 +20,7 @@ multirun/
 /mlflow.db-*
 media/
 .pytest_cache/
+artifact-smoke-model.txt
 
 # Data
 data/
