@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+from omegaconf import DictConfig, OmegaConf
 
 
 @dataclass
@@ -40,3 +43,15 @@ class ExperimentConfig:
     env: EnvConfig = field(default_factory=EnvConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
+
+
+def to_experiment_config(
+    raw_cfg: DictConfig | Mapping[str, Any] | None = None,
+) -> ExperimentConfig:
+    """Merge a Hydra/OmegaConf config into the structured experiment dataclasses."""
+    structured = OmegaConf.structured(ExperimentConfig)
+    merged = OmegaConf.merge(structured, raw_cfg or {})
+    cfg = OmegaConf.to_object(merged)
+    if not isinstance(cfg, ExperimentConfig):
+        raise TypeError(f"Expected ExperimentConfig, got {type(cfg)!r}")
+    return cfg

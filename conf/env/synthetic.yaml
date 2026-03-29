@@ -1,0 +1,7 @@
+num_items: 1000
+num_candidates: 50
+slate_size: 10
+user_dim: 32
+item_dim: 32
+position_bias_decay: 0.5
+

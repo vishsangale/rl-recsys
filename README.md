@@ -16,6 +16,12 @@ pip install -e ".[dev]"
 # Run synthetic experiment
 python experiments/run_synthetic.py
 
+# Inspect the effective Hydra config without running
+python experiments/run_synthetic.py --cfg job --resolve
+
+# Override values from the CLI
+python experiments/run_synthetic.py train.num_episodes=25 env.slate_size=5 train.seed=7
+
 # Run tests
 pytest tests/
 ```

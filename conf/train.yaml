@@ -1,0 +1,6 @@
+defaults:
+  - env: synthetic
+  - agent: random
+  - train: default
+  - _self_
+

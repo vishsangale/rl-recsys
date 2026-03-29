@@ -1,0 +1,5 @@
+num_episodes: 100
+eval_every: 50
+log_every: 10
+seed: 42
+

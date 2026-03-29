@@ -6,11 +6,14 @@ build/
 .eggs/
 *.egg
 .venv/
+.venv-hydra/
 venv/
 .env
 *.pt
 *.pth
 checkpoints/
+outputs/
+multirun/
 media/
 .pytest_cache/
 
