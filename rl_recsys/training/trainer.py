@@ -5,6 +5,13 @@ import numpy as np
 from rl_recsys.agents.base import Agent
 from rl_recsys.config import ExperimentConfig
 from rl_recsys.environments.base import RecEnv
+from rl_recsys.runtime import (
+    TrackingIds,
+    ensure_runtime_dirs,
+    now_timestamp,
+    write_project_manifest,
+    write_run_manifest,
+)
 from rl_recsys.training.metrics import ctr, mrr, ndcg_at_k
 from rl_recsys.training.mlflow_logger import finish_mlflow, init_mlflow, log_mlflow_metrics
 from rl_recsys.training.wandb_logger import finish_wandb, init_wandb, log_wandb_metrics
@@ -17,8 +24,17 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
     """
     rng = np.random.default_rng(cfg.train.seed)
     history: list[dict[str, float]] = []
+    started_at = now_timestamp()
+    ensure_runtime_dirs(cfg)
+    write_project_manifest(cfg)
     wandb_run = init_wandb(cfg)
     mlflow_run = init_mlflow(cfg)
+    tracking_ids = TrackingIds(
+        workspace_run_id=cfg.runtime.workspace_run_id,
+        wandb_run_id=getattr(wandb_run, "id", None),
+        mlflow_run_id=getattr(getattr(mlflow_run, "info", None), "run_id", None),
+    )
+    write_run_manifest(cfg, tracking_ids=tracking_ids, status="running", started_at=started_at)
 
     for ep in range(cfg.train.num_episodes):
         obs = env.reset(seed=int(rng.integers(0, 2**31)))
@@ -63,12 +79,21 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
         )
         finish_mlflow(
             mlflow_run,
+            cfg=cfg,
             summary=summary,
             history=history,
             artifact_path=cfg.mlflow.artifact_path,
         )
     else:
         finish_wandb(wandb_run)
-        finish_mlflow(mlflow_run)
+        finish_mlflow(mlflow_run, cfg=cfg)
+
+    write_run_manifest(
+        cfg,
+        tracking_ids=tracking_ids,
+        status="finished",
+        started_at=started_at,
+        finished_at=now_timestamp(),
+    )
 
     return history

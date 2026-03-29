@@ -1,15 +1,24 @@
 """Run a random-agent baseline on the synthetic environment."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from pathlib import Path
+
 import hydra
 import numpy as np
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from rl_recsys.agents.base import Agent
 from rl_recsys.config import ExperimentConfig, to_experiment_config
 from rl_recsys.environments.base import RecObs
 from rl_recsys.environments.synthetic import SyntheticEnv
 from rl_recsys.training.trainer import train
+
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+OmegaConf.register_new_resolver("workspace_root", lambda: str(WORKSPACE_ROOT), replace=True)
+OmegaConf.register_new_resolver("workspace_run_id", lambda: WORKSPACE_RUN_ID, replace=True)
 
 
 class RandomAgent(Agent):

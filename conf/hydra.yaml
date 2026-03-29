@@ -2,8 +2,7 @@ hydra:
   job:
     chdir: false
   run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${runtime.hydra_dir}
   sweep:
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${runtime.project_results_dir}/multirun/${now:%Y%m%d_%H%M%S_%f}
     subdir: ${hydra.job.num}
-

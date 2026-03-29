@@ -1,0 +1,17 @@
+repo_root: ${hydra:runtime.cwd}
+workspace_root: ${workspace_root:}
+results_root: ${runtime.workspace_root}/results
+project_name: rl-recsys
+project_results_dir: ${runtime.results_root}/${runtime.project_name}
+workspace_run_id: ${workspace_run_id:}
+run_dir: ${runtime.project_results_dir}/runs/${runtime.workspace_run_id}
+hydra_dir: ${runtime.run_dir}/hydra
+wandb_dir: ${runtime.run_dir}/wandb
+tb_dir: ${runtime.run_dir}/tb
+mlflow_dir: ${runtime.run_dir}/mlflow
+logs_dir: ${runtime.run_dir}/logs
+checkpoints_dir: ${runtime.run_dir}/checkpoints
+exports_dir: ${runtime.run_dir}/exports
+mlflow_tracking_uri: sqlite:///${runtime.project_results_dir}/mlflow/mlflow.db
+project_manifest_path: ${runtime.project_results_dir}/project.yaml
+run_manifest_path: ${runtime.run_dir}/run.yaml

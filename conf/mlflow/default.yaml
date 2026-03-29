@@ -1,6 +1,6 @@
 enabled: false
-tracking_uri: sqlite:///mlflow.db
-experiment_name: rl-recsys
-run_name: null
-artifact_path: artifacts
+tracking_uri: ${runtime.mlflow_tracking_uri}
+experiment_name: ${runtime.project_name}
+run_name: ${runtime.workspace_run_id}
+artifact_path: ${runtime.workspace_run_id}
 tags: {}

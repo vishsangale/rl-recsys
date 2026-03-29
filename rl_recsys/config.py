@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping
 
 from omegaconf import DictConfig, OmegaConf
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = REPO_ROOT.parent
 
 
 @dataclass
@@ -62,12 +67,38 @@ class MlflowConfig:
 
 
 @dataclass
+class RuntimeConfig:
+    repo_root: str = str(REPO_ROOT)
+    workspace_root: str = str(WORKSPACE_ROOT)
+    results_root: str = str(WORKSPACE_ROOT / "results")
+    project_name: str = "rl-recsys"
+    project_results_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys")
+    workspace_run_id: str = "run"
+    run_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run")
+    hydra_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "hydra")
+    wandb_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "wandb")
+    tb_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "tb")
+    mlflow_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "mlflow")
+    logs_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "logs")
+    checkpoints_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "checkpoints")
+    exports_dir: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "exports")
+    mlflow_tracking_uri: str = str(
+        "sqlite:///" + str((WORKSPACE_ROOT / "results" / "rl-recsys" / "mlflow" / "mlflow.db").as_posix())
+    )
+    project_manifest_path: str = str(WORKSPACE_ROOT / "results" / "rl-recsys" / "project.yaml")
+    run_manifest_path: str = str(
+        WORKSPACE_ROOT / "results" / "rl-recsys" / "runs" / "run" / "run.yaml"
+    )
+
+
+@dataclass
 class ExperimentConfig:
     env: EnvConfig = field(default_factory=EnvConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
     wandb: WandbConfig = field(default_factory=WandbConfig)
     mlflow: MlflowConfig = field(default_factory=MlflowConfig)
+    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
 
 
 def to_experiment_config(

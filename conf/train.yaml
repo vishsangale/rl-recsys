@@ -2,6 +2,7 @@ defaults:
   - env: synthetic
   - agent: random
   - train: default
+  - runtime: default
   - wandb: default
   - mlflow: default
   - _self_

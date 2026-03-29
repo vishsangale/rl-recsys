@@ -1,9 +1,9 @@
 enabled: false
-project: rl-recsys
+project: ${runtime.project_name}
 entity: null
 mode: offline
 base_url: null
 group: null
 job_type: train
-dir: wandb
+dir: ${runtime.wandb_dir}
 tags: []

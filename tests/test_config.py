@@ -23,3 +23,5 @@ def test_to_experiment_config_merges_nested_values() -> None:
     assert cfg.wandb.base_url is None
     assert cfg.mlflow.enabled is False
     assert cfg.mlflow.tracking_uri == "sqlite:///mlflow.db"
+    assert cfg.runtime.project_name == "rl-recsys"
+    assert cfg.runtime.results_root.endswith("/results")
