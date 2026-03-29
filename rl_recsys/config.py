@@ -44,6 +44,7 @@ class WandbConfig:
     project: str = "rl-recsys"
     entity: str | None = None
     mode: str = "offline"
+    base_url: str | None = None
     group: str | None = None
     job_type: str = "train"
     dir: str = "wandb"

@@ -25,6 +25,17 @@ python experiments/run_synthetic.py train.num_episodes=25 env.slate_size=5 train
 # Enable offline W&B logging
 python experiments/run_synthetic.py wandb.enabled=true wandb.mode=offline
 
+# Connect to an existing W&B server
+export WANDB_API_KEY=your_api_key
+python experiments/run_synthetic.py \
+  wandb.enabled=true \
+  wandb.mode=online \
+  wandb.base_url=http://your-wandb-server:8080
+
+# Verify the server before sending online runs
+python /home/vishsangale/workspace/latent-superpowers/core/wandb/scripts/check_wandb_server.py \
+  --base-url http://your-wandb-server:8080 --json
+
 # Run tests
 pytest tests/
 ```

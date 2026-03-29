@@ -20,3 +20,4 @@ def test_to_experiment_config_merges_nested_values() -> None:
     assert cfg.train.seed == 3
     assert cfg.agent.name == "random"
     assert cfg.wandb.enabled is False
+    assert cfg.wandb.base_url is None

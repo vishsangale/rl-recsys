@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import os
 from typing import Any
 
 from rl_recsys.config import ExperimentConfig
@@ -16,6 +17,9 @@ def init_wandb(cfg: ExperimentConfig):
         raise RuntimeError(
             "wandb logging is enabled but the wandb package is not installed."
         ) from exc
+
+    if cfg.wandb.base_url:
+        os.environ["WANDB_BASE_URL"] = cfg.wandb.base_url
 
     return wandb.init(
         project=cfg.wandb.project,
