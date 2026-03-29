@@ -25,6 +25,9 @@ python experiments/run_synthetic.py train.num_episodes=25 env.slate_size=5 train
 # Enable offline W&B logging
 python experiments/run_synthetic.py wandb.enabled=true wandb.mode=offline
 
+# Enable local MLflow tracking
+python experiments/run_synthetic.py mlflow.enabled=true mlflow.tracking_uri=mlruns
+
 # Connect to an existing W&B server
 export WANDB_API_KEY=your_api_key
 python experiments/run_synthetic.py \

@@ -6,6 +6,7 @@ from rl_recsys.agents.base import Agent
 from rl_recsys.config import ExperimentConfig
 from rl_recsys.environments.base import RecEnv
 from rl_recsys.training.metrics import ctr, mrr, ndcg_at_k
+from rl_recsys.training.mlflow_logger import finish_mlflow, init_mlflow, log_mlflow_metrics
 from rl_recsys.training.wandb_logger import finish_wandb, init_wandb, log_wandb_metrics
 
 
@@ -17,6 +18,7 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
     rng = np.random.default_rng(cfg.train.seed)
     history: list[dict[str, float]] = []
     wandb_run = init_wandb(cfg)
+    mlflow_run = init_mlflow(cfg)
 
     for ep in range(cfg.train.num_episodes):
         obs = env.reset(seed=int(rng.integers(0, 2**31)))
@@ -42,6 +44,7 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
         }
         history.append(metrics)
         log_wandb_metrics(wandb_run, metrics)
+        log_mlflow_metrics(mlflow_run, metrics, step=ep)
 
         if ep % cfg.train.log_every == 0:
             print(
@@ -50,14 +53,22 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
             )
 
     if history:
+        summary = {
+            "avg_reward": float(np.mean([entry["reward"] for entry in history])),
+            "final_ctr": float(history[-1]["ctr"]),
+        }
         finish_wandb(
             wandb_run,
-            summary={
-                "avg_reward": float(np.mean([entry["reward"] for entry in history])),
-                "final_ctr": float(history[-1]["ctr"]),
-            },
+            summary=summary,
+        )
+        finish_mlflow(
+            mlflow_run,
+            summary=summary,
+            history=history,
+            artifact_path=cfg.mlflow.artifact_path,
         )
     else:
         finish_wandb(wandb_run)
+        finish_mlflow(mlflow_run)
 
     return history

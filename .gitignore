@@ -15,6 +15,7 @@ checkpoints/
 outputs/
 multirun/
 /wandb/
+/mlruns/
 media/
 .pytest_cache/
 

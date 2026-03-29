@@ -52,11 +52,22 @@ class WandbConfig:
 
 
 @dataclass
+class MlflowConfig:
+    enabled: bool = False
+    tracking_uri: str = "mlruns"
+    experiment_name: str = "rl-recsys"
+    run_name: str | None = None
+    artifact_path: str = "artifacts"
+    tags: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class ExperimentConfig:
     env: EnvConfig = field(default_factory=EnvConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
     wandb: WandbConfig = field(default_factory=WandbConfig)
+    mlflow: MlflowConfig = field(default_factory=MlflowConfig)
 
 
 def to_experiment_config(

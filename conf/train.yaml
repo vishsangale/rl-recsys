@@ -3,4 +3,5 @@ defaults:
   - agent: random
   - train: default
   - wandb: default
+  - mlflow: default
   - _self_
