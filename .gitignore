@@ -25,3 +25,6 @@ artifact-smoke-model.txt
 # Data
 data/
 !rl_recsys/data/pipelines/
+
+# Git worktrees
+.worktrees/
