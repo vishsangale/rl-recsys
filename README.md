@@ -10,6 +10,18 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Python Environment
+
+Activate the virtualenv once before running repo commands:
+
+```bash
+source .venv/bin/activate
+```
+
+The examples below assume the virtualenv is active, so they use `python` and
+`pytest` directly. For non-interactive automation, use `.venv/bin/python` and
+`.venv/bin/pytest` if activating the shell first is not practical.
+
 ## Usage
 
 ```bash
@@ -45,6 +57,29 @@ pytest tests/
 # Validate the repo surface
 python tools/validate_repo.py
 ```
+
+## Datasets
+
+Dataset preparation is registry-driven through `scripts/prepare_data.py`.
+
+```bash
+# List available dataset keys
+python scripts/prepare_data.py --help
+
+# Download and process one dataset
+python scripts/prepare_data.py --dataset movielens-100k --download --process
+
+# Override storage locations
+python scripts/prepare_data.py \
+  --dataset amazon-books \
+  --raw-dir /data/raw/amazon/Books \
+  --processed-dir /data/processed/amazon/Books \
+  --download --process
+```
+
+The current registry has 17 dataset keys across CF, session, slate RL, and
+off-policy evaluation data. See [docs/datasets.md](docs/datasets.md) for the
+full catalog and guidance on which dataset to use.
 
 ## Architecture
 
