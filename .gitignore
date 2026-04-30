@@ -26,6 +26,7 @@ artifact-smoke-model.txt
 data/
 !rl_recsys/data/pipelines/
 !rl_recsys/data/download.py
+!rl_recsys/data/schema.py
 
 # Git worktrees
 .worktrees/
