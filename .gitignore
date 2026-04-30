@@ -22,11 +22,8 @@ media/
 .pytest_cache/
 artifact-smoke-model.txt
 
-# Data
-data/
-!rl_recsys/data/pipelines/
-!rl_recsys/data/download.py
-!rl_recsys/data/schema.py
+# Data (anchor to project root so rl_recsys/data/ is unaffected)
+/data/
 
 # Git worktrees
 .worktrees/
