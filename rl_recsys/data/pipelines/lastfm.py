@@ -70,3 +70,15 @@ class LastFMPipeline(BasePipeline):
         output_path = self.processed_dir / "interactions.parquet"
         df.to_parquet(output_path, index=False)
         print(f"Processed data saved to {output_path}")
+
+
+from rl_recsys.data.registry import register  # noqa: E402
+
+register(
+    "lastfm-1k",
+    LastFMPipeline,
+    schema="sessions",
+    tags=["Session", "music"],
+    raw_dir="data/raw/lastfm",
+    processed_dir="data/processed/lastfm",
+)

@@ -63,3 +63,15 @@ class RL4RSPipeline(BasePipeline):
         df_rl = pd.read_csv(rl_file)
         df_rl.to_parquet(self.processed_dir / "slate_eval.parquet", index=False)
         print(f"Processed data saved to {self.processed_dir}")
+
+
+from rl_recsys.data.registry import register  # noqa: E402
+
+register(
+    "rl4rs",
+    RL4RSPipeline,
+    schema="slates",
+    tags=["RL/Slate"],
+    raw_dir="data/raw/rl4rs",
+    processed_dir="data/processed/rl4rs",
+)
