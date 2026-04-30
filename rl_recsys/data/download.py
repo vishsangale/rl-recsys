@@ -13,6 +13,7 @@ def download_file(
     *,
     chunk_size: int = 8192,
     expected_md5: str | None = None,
+    verify: bool = True,
 ) -> None:
     if dest.exists():
         if expected_md5 is None or _md5(dest) == expected_md5:
@@ -24,7 +25,7 @@ def download_file(
     tmp = dest.with_suffix(dest.suffix + ".part")
 
     try:
-        response = requests.get(url, stream=True, timeout=60)
+        response = requests.get(url, stream=True, timeout=60, verify=verify)
         response.raise_for_status()
         total = int(response.headers.get("content-length", 0))
 

@@ -8,6 +8,12 @@ import rl_recsys.data.pipelines.movielens  # noqa: F401
 import rl_recsys.data.pipelines.lastfm  # noqa: F401
 import rl_recsys.data.pipelines.rl4rs  # noqa: F401
 import rl_recsys.data.pipelines.book_crossing  # noqa: F401
+import rl_recsys.data.pipelines.kuairec  # noqa: F401
+import rl_recsys.data.pipelines.finn_no_slate  # noqa: F401
+import rl_recsys.data.pipelines.open_bandit  # noqa: F401
+import rl_recsys.data.pipelines.gowalla  # noqa: F401
+import rl_recsys.data.pipelines.steam  # noqa: F401
+import rl_recsys.data.pipelines.amazon  # noqa: F401
 
 from rl_recsys.data.registry import get_pipeline, list_datasets
 
