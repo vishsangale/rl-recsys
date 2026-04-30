@@ -23,16 +23,20 @@ def download_file(
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
 
-    response = requests.get(url, stream=True, timeout=60)
-    response.raise_for_status()
-    total = int(response.headers.get("content-length", 0))
+    try:
+        response = requests.get(url, stream=True, timeout=60)
+        response.raise_for_status()
+        total = int(response.headers.get("content-length", 0))
 
-    with open(tmp, "wb") as f, tqdm(total=total, unit="iB", unit_scale=True, desc=dest.name) as pbar:
-        for chunk in response.iter_content(chunk_size):
-            f.write(chunk)
-            pbar.update(len(chunk))
+        with open(tmp, "wb") as f, tqdm(total=total, unit="iB", unit_scale=True, desc=dest.name) as pbar:
+            for chunk in response.iter_content(chunk_size):
+                f.write(chunk)
+                pbar.update(len(chunk))
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
-    if expected_md5 and _md5(tmp) != expected_md5:
+    if expected_md5 is not None and _md5(tmp) != expected_md5:
         tmp.unlink()
         raise ValueError(f"Checksum mismatch for {dest.name} after download")
 
