@@ -16,8 +16,10 @@ class MovieLensPipeline(BasePipeline):
     DATASET_URL = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
 
     def __init__(self, raw_dir: str | Path = "data/raw/movielens",
-                 processed_dir: str | Path = "data/processed/movielens") -> None:
+                 processed_dir: str | Path = "data/processed/movielens",
+                 variant: str = "100k") -> None:
         super().__init__(raw_dir, processed_dir)
+        self.variant = variant
 
     def download(self) -> None:
         """Download and extract the MovieLens-100k dataset."""
