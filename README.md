@@ -41,6 +41,12 @@ python experiments/run_ope_benchmark.py \
   --dataset open-bandit \
   --download --process
 
+# Run across every processed Open Bandit policy and campaign split
+python experiments/run_ope_benchmark.py \
+  --dataset open-bandit \
+  --policy any \
+  --campaign any
+
 # Inspect the effective Hydra config without running
 python experiments/run_synthetic.py --cfg job --resolve
 
@@ -95,8 +101,10 @@ off-policy evaluation data. See [docs/datasets.md](docs/datasets.md) for the
 full catalog and guidance on which dataset to use.
 
 Open Bandit is the first supported logged-policy benchmark path. It preserves
-`propensity_score`, so `experiments/run_ope_benchmark.py` can report replay,
-IPS, and self-normalized IPS estimates for top-1 target policies.
+`propensity_score`, `policy`, and `campaign`, so
+`experiments/run_ope_benchmark.py` can report replay, IPS, and self-normalized
+IPS estimates for top-1 target policies on one slice or across all processed
+splits.
 
 ## Architecture
 

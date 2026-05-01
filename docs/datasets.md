@@ -47,7 +47,7 @@ The common schema labels are:
 | Implicit feedback | `steam` | `kuairec` | Steam uses hours played; KuaiRec uses watch ratio. |
 | Sequential or event-style recommendation | `gowalla` | `lastfm-1k` | Gowalla is check-ins; Last.fm is listening events. |
 | Slate recommendation | `finn-no-slate` | `rl4rs` | FINN.no has explicit slate/click structure; RL4RS keeps native slate/eval files. |
-| Off-policy evaluation | `open-bandit` | custom OPE splits | Preserves `propensity_score`; anonymous users are encoded as `user_id = 0`. |
+| Off-policy evaluation | `open-bandit` | filtered OPE splits | Preserves `propensity_score`, `policy`, and `campaign`; anonymous users are encoded as `user_id = 0`. |
 | RL environment construction | `kuairec` | `finn-no-slate` | KuaiRec is useful for dense user-item feedback; FINN.no is useful for real slate logs. |
 
 ## Available Dataset Keys
@@ -66,7 +66,7 @@ The common schema labels are:
 | `amazon-video-games` | `interactions` | Amazon Reviews 2018 Video Games 5-core ratings | Product-review CF in games | Same Amazon pipeline with category override |
 | `steam` | `interactions` | 7.8M Steam reviews, hours played | Implicit-feedback CF | Parses Python-literal rows with `ast.literal_eval`; rating is `hours` |
 | `kuairec` | `interactions` | 12M Kuaishou interactions, watch ratio | RL/simulator work and implicit video feedback | `interactions.parquet`; download uses `verify=False` for the source host |
-| `open-bandit` | `interactions` | 26M logged bandit events | Off-policy evaluation | `interactions.parquet`; click is rating, `propensity_score` is retained |
+| `open-bandit` | `interactions` | 26M logged bandit events across random/BTS policies and all/men/women campaigns | Off-policy evaluation | `interactions.parquet`; click is rating, `propensity_score`, `policy`, `campaign`, and `position` are retained |
 | `gowalla` | `sessions` | 6.4M check-ins, 196K users | Location/event recommendation | `sessions.parquet`; location IDs are factorized as items |
 | `lastfm-1k` | `sessions` | 19M listening events, 1K users | Music listening sequences | Legacy output currently keeps native listening columns plus factorized IDs |
 | `finn-no-slate` | `slates` | 37M slate impressions, 25 candidates per slate | Slate ranking and click modeling | `slates.parquet`; includes slate candidate list, click index, timestamp |
@@ -77,6 +77,9 @@ The common schema labels are:
 - Start with `movielens-100k` when validating a new model or data loader.
 - Prefer `open-bandit` only when the method uses logged propensities or OPE
   assumptions; it has no persistent user identity.
+- `experiments/run_ope_benchmark.py` defaults to the historical
+  `policy=random`, `campaign=all` slice. Use `--policy any --campaign any` when
+  you want all processed Open Bandit splits.
 - Use `finn-no-slate` for real slate choice data. Use `kuairec` when you need
   denser user-item feedback for environment construction.
 - Several large pipelines currently load source files with pandas in memory.

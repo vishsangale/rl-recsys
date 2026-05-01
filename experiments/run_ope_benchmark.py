@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from rl_recsys.agents import LinUCBAgent, RandomAgent
 from rl_recsys.config import AgentConfig, EnvConfig
@@ -17,6 +18,8 @@ from rl_recsys.evaluation.ope import evaluate_ope_agent
 
 PIPELINE_MODULES = ["rl_recsys.data.pipelines.open_bandit"]
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_POLICY = "random"
+DEFAULT_CAMPAIGN = "all"
 
 
 def main() -> None:
@@ -35,7 +38,7 @@ def main() -> None:
     if not path.exists():
         raise FileNotFoundError(f"processed dataset not found: {path}")
 
-    df = pd.read_parquet(path)
+    df = _load_open_bandit_interactions(path, policy=args.policy, campaign=args.campaign)
     if args.max_rows is not None and len(df) > args.max_rows:
         df = df.sample(n=args.max_rows, random_state=args.seed).reset_index(drop=True)
 
@@ -75,6 +78,10 @@ def main() -> None:
             {
                 "dataset": args.dataset,
                 "rows": int(len(df)),
+                "policy_filter": args.policy,
+                "campaign_filter": args.campaign,
+                "policies": ",".join(sorted(map(str, df["policy"].unique()))),
+                "campaigns": ",".join(sorted(map(str, df["campaign"].unique()))),
                 "num_candidates": args.num_candidates,
                 "feature_dim": args.feature_dim,
                 "seed": args.seed,
@@ -96,6 +103,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", default="open-bandit")
     parser.add_argument("--download", action="store_true", help="Download raw files.")
     parser.add_argument("--process", action="store_true", help="Process raw files.")
+    parser.add_argument(
+        "--policy",
+        choices=["random", "bts", "any"],
+        default=DEFAULT_POLICY,
+        help="Open Bandit behavior policy slice. Use 'any' for all policies.",
+    )
+    parser.add_argument(
+        "--campaign",
+        choices=["all", "men", "women", "any"],
+        default=DEFAULT_CAMPAIGN,
+        help="Open Bandit campaign slice. Use 'any' for all campaigns.",
+    )
     parser.add_argument("--episodes", type=int, default=2000)
     parser.add_argument("--num-candidates", type=int, default=50)
     parser.add_argument("--feature-dim", type=int, default=16)
@@ -113,6 +132,40 @@ def _parse_args() -> argparse.Namespace:
 def _register_builtin_pipelines() -> None:
     for module in PIPELINE_MODULES:
         importlib.import_module(module)
+
+
+def _load_open_bandit_interactions(
+    path: Path,
+    *,
+    policy: str,
+    campaign: str,
+) -> pd.DataFrame:
+    schema_names = set(pq.read_schema(path).names)
+    has_split_metadata = {"policy", "campaign"}.issubset(schema_names)
+
+    if not has_split_metadata:
+        if policy not in {"any", DEFAULT_POLICY} or campaign not in {"any", DEFAULT_CAMPAIGN}:
+            raise ValueError(
+                "processed Open Bandit file has no policy/campaign columns; "
+                "rerun with --process before filtering non-default splits"
+            )
+        df = pd.read_parquet(path)
+        df["policy"] = DEFAULT_POLICY
+        df["campaign"] = DEFAULT_CAMPAIGN
+        return df
+
+    filters: list[tuple[str, str, str]] = []
+    if policy != "any":
+        filters.append(("policy", "==", policy))
+    if campaign != "any":
+        filters.append(("campaign", "==", campaign))
+
+    df = pd.read_parquet(path, filters=filters or None)
+    if df.empty:
+        raise ValueError(
+            f"no Open Bandit rows matched policy={policy!r}, campaign={campaign!r}"
+        )
+    return df.reset_index(drop=True)
 
 
 if __name__ == "__main__":
