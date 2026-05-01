@@ -6,7 +6,6 @@ build/
 .eggs/
 *.egg
 .venv/
-.venv-hydra/
 venv/
 .env
 *.pt
@@ -29,5 +28,5 @@ artifact-smoke-model.txt
 # Git worktrees
 .worktrees/
 
-# Standalone external-work repositories.
-/external_work/rl_recsys_literature_2021_2026/
+# External literature/code checkouts stay local-only.
+/external_work/

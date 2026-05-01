@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 IGNORE_DIRS = {
     ".git",
     ".venv",
-    ".venv-hydra",
     "__pycache__",
     ".pytest_cache",
     "external_work",
