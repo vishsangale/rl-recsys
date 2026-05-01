@@ -13,7 +13,7 @@ def test_instantiation_sets_dirs(tmp_path):
 
 def test_process_produces_correct_schema(tmp_path):
     raw_dir = tmp_path / "raw"
-    campaign_dir = raw_dir / "open_bandit_dataset" / "all" / "random"
+    campaign_dir = raw_dir / "open_bandit_dataset" / "random" / "all"
     campaign_dir.mkdir(parents=True)
     (campaign_dir / "all.csv").write_text(
         "timestamp,item_id,position,click,propensity_score,user_feature_0\n"

@@ -34,9 +34,7 @@ class OpenBanditPipeline(BasePipeline):
             zf.extractall(self.raw_dir)
 
     def process(self) -> None:
-        csv_file = self.raw_dir / "open_bandit_dataset" / "all" / "random" / "all.csv"
-        if not csv_file.exists():
-            raise FileNotFoundError(f"Not found: {csv_file}. Run --download first.")
+        csv_file = self._find_random_all_csv()
 
         df = pd.read_csv(csv_file)
         df["user_id"] = 0
@@ -47,6 +45,23 @@ class OpenBanditPipeline(BasePipeline):
         df[[c for c in keep if c in df.columns]].to_parquet(out, index=False)
         validate_parquet_schema(out, "interactions")
         print(f"Saved {len(df):,} rows to {out}")
+
+    def _find_random_all_csv(self) -> Path:
+        candidates = [
+            self.raw_dir / "open_bandit_dataset" / "random" / "all" / "all.csv",
+            self.raw_dir / "open_bandit_dataset" / "all" / "random" / "all.csv",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+
+        matches = sorted(self.raw_dir.glob("**/random/all/all.csv"))
+        if matches:
+            return matches[0]
+        raise FileNotFoundError(
+            f"Open Bandit random/all/all.csv not found under {self.raw_dir}. "
+            "Run --download first."
+        )
 
 
 from rl_recsys.data.registry import register  # noqa: E402

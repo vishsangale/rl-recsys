@@ -36,6 +36,11 @@ python experiments/run_dataset_bandit.py \
   --datasets movielens-100k movielens-1m \
   --download --process
 
+# Run Open Bandit off-policy evaluation with replay, IPS, and SNIPS
+python experiments/run_ope_benchmark.py \
+  --dataset open-bandit \
+  --download --process
+
 # Inspect the effective Hydra config without running
 python experiments/run_synthetic.py --cfg job --resolve
 
@@ -88,6 +93,10 @@ python scripts/prepare_data.py \
 The current registry has 17 dataset keys across CF, session, slate RL, and
 off-policy evaluation data. See [docs/datasets.md](docs/datasets.md) for the
 full catalog and guidance on which dataset to use.
+
+Open Bandit is the first supported logged-policy benchmark path. It preserves
+`propensity_score`, so `experiments/run_ope_benchmark.py` can report replay,
+IPS, and self-normalized IPS estimates for top-1 target policies.
 
 ## Architecture
 
