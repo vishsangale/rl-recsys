@@ -1,0 +1,113 @@
+from pathlib import Path
+
+import numpy as np
+import pytest
+from hydra import compose, initialize_config_dir
+from omegaconf import OmegaConf
+
+from rl_recsys.agents import LinUCBAgent, RandomAgent, build_agent
+from rl_recsys.config import AgentConfig, EnvConfig
+from rl_recsys.environments.base import RecObs
+
+
+def _obs() -> RecObs:
+    return RecObs(
+        user_features=np.array([1.0, 0.0], dtype=np.float32),
+        candidate_features=np.array(
+            [
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [0.5, 0.5],
+            ],
+            dtype=np.float32,
+        ),
+        candidate_ids=np.array([10, 20, 30]),
+    )
+
+
+def test_random_agent_selects_unique_slate() -> None:
+    agent = RandomAgent(slate_size=2)
+    slate = agent.select_slate(_obs())
+
+    assert slate.shape == (2,)
+    assert len(set(slate.tolist())) == 2
+    assert set(slate.tolist()).issubset({0, 1, 2})
+
+
+def test_linucb_selects_unique_slate() -> None:
+    agent = LinUCBAgent(slate_size=2, user_dim=2, item_dim=2, alpha=1.0)
+    slate = agent.select_slate(_obs())
+
+    assert slate.shape == (2,)
+    assert len(set(slate.tolist())) == 2
+    assert set(slate.tolist()).issubset({0, 1, 2})
+
+
+def test_linucb_update_changes_parameters() -> None:
+    agent = LinUCBAgent(slate_size=2, user_dim=2, item_dim=2, alpha=1.0)
+    before_a = agent._a_matrix.copy()
+    before_b = agent._b_vector.copy()
+
+    metrics = agent.update(
+        _obs(),
+        slate=np.array([0, 1]),
+        reward=1.0,
+        clicks=np.array([1.0, 0.0]),
+        next_obs=_obs(),
+    )
+
+    assert metrics["agent_updates"] == 2.0
+    assert not np.array_equal(agent._a_matrix, before_a)
+    assert not np.array_equal(agent._b_vector, before_b)
+
+
+def test_linucb_positive_feedback_improves_clicked_candidate_score() -> None:
+    agent = LinUCBAgent(slate_size=1, user_dim=2, item_dim=2, alpha=0.0)
+    obs = _obs()
+
+    before_scores = agent.score_candidates(obs)
+    for _ in range(5):
+        agent.update(
+            obs,
+            slate=np.array([0]),
+            reward=1.0,
+            clicks=np.array([1.0]),
+            next_obs=obs,
+        )
+    after_scores = agent.score_candidates(obs)
+
+    assert after_scores[0] > before_scores[0]
+    assert after_scores[0] > after_scores[1]
+    assert agent.select_slate(obs).tolist() == [0]
+
+
+def test_linucb_requires_matching_user_and_item_dims() -> None:
+    with pytest.raises(ValueError, match="user_dim == item_dim"):
+        LinUCBAgent(slate_size=1, user_dim=2, item_dim=3)
+
+
+def test_build_agent_supports_random_and_linucb() -> None:
+    env_cfg = EnvConfig(slate_size=2, user_dim=2, item_dim=2)
+
+    random_agent = build_agent(AgentConfig(name="random"), env_cfg)
+    linucb_agent = build_agent(AgentConfig(name="linucb", alpha=0.5), env_cfg)
+
+    assert isinstance(random_agent, RandomAgent)
+    assert isinstance(linucb_agent, LinUCBAgent)
+
+
+def test_build_agent_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError, match="Unknown agent"):
+        build_agent(AgentConfig(name="missing"), EnvConfig())
+
+
+def test_hydra_can_load_linucb_agent_config() -> None:
+    config_dir = str(Path(__file__).resolve().parents[1] / "conf")
+    OmegaConf.register_new_resolver("workspace_root", lambda: "/tmp", replace=True)
+    OmegaConf.register_new_resolver("workspace_run_id", lambda: "test", replace=True)
+
+    with initialize_config_dir(version_base="1.3", config_dir=config_dir):
+        cfg = compose(config_name="train", overrides=["agent=linucb"])
+
+    assert cfg.agent.name == "linucb"
+    assert cfg.agent.alpha == 1.0

@@ -1,6 +1,6 @@
 # rl-recsys
 
-RL-based recommendation ranking with LinUCB, REINFORCE (Plackett-Luce), and Slate-Q.
+RL-based recommendation ranking scaffold with random and shared LinUCB baselines.
 
 ## Install
 
@@ -27,6 +27,14 @@ The examples below assume the virtualenv is active, so they use `python` and
 ```bash
 # Run synthetic experiment
 python experiments/run_synthetic.py
+
+# Run the shared contextual LinUCB baseline
+python experiments/run_synthetic.py agent=linucb
+
+# Compare random and LinUCB on sampled logged interactions
+python experiments/run_dataset_bandit.py \
+  --datasets movielens-100k movielens-1m \
+  --download --process
 
 # Inspect the effective Hydra config without running
 python experiments/run_synthetic.py --cfg job --resolve
@@ -85,7 +93,7 @@ full catalog and guidance on which dataset to use.
 
 - `rl_recsys/config.py` — dataclass configs (EnvConfig, AgentConfig, TrainConfig)
 - `rl_recsys/environments/` — recommendation environments (synthetic latent-factor)
-- `rl_recsys/agents/` — RL agents (LinUCB, REINFORCE, Slate-Q)
+- `rl_recsys/agents/` — recommendation agents (random, LinUCB)
 - `rl_recsys/rewards/` — reward models (click-sum, DCG)
 - `rl_recsys/networks/` — neural network components (MLP, ItemScorer)
 - `rl_recsys/data/` — replay buffer and data utilities

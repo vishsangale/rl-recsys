@@ -51,5 +51,11 @@ def get_pipeline(
     return info.pipeline_cls(**merged)
 
 
+def get_dataset_info(name: str) -> DatasetInfo:
+    if name not in _REGISTRY:
+        raise ValueError(f"Unknown dataset {name!r}. Available: {sorted(_REGISTRY)}")
+    return _REGISTRY[name]
+
+
 def list_datasets() -> list[str]:
     return sorted(_REGISTRY)

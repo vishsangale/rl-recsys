@@ -31,6 +31,21 @@ def test_get_pipeline_unknown_raises():
         reg.get_pipeline("_nonexistent_xyz_abc")
 
 
+def test_get_dataset_info_returns_metadata(tmp_path):
+    reg.register(
+        "_test_info",
+        MovieLensPipeline,
+        schema="interactions",
+        tags=["CF"],
+        variant="100k",
+        raw_dir=str(tmp_path / "raw"),
+        processed_dir=str(tmp_path / "proc"),
+    )
+    info = reg.get_dataset_info("_test_info")
+    assert info.name == "_test_info"
+    assert info.schema == "interactions"
+
+
 def test_get_pipeline_overrides_raw_dir(tmp_path):
     reg.register(
         "_test_override",

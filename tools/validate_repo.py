@@ -9,7 +9,14 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-IGNORE_DIRS = {".git", ".venv", ".venv-hydra", "__pycache__", ".pytest_cache"}
+IGNORE_DIRS = {
+    ".git",
+    ".venv",
+    ".venv-hydra",
+    "__pycache__",
+    ".pytest_cache",
+    "external_work",
+}
 
 
 def run(cmd: list[str], *, cwd: Path | None = None) -> None:

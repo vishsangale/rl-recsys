@@ -45,7 +45,7 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
         slate = agent.select_slate(obs)
         step = env.step(slate)
 
-        agent.update(obs, slate, step.reward, step.clicks, step.obs)
+        agent_metrics = agent.update(obs, slate, step.reward, step.clicks, step.obs)
 
         episode_rewards.append(step.reward)
         episode_clicks.append(step.clicks)
@@ -58,6 +58,7 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
             "mrr": mrr(all_clicks),
             "ctr": ctr(all_clicks),
         }
+        metrics.update(agent_metrics)
         history.append(metrics)
         log_wandb_metrics(wandb_run, metrics)
         log_mlflow_metrics(mlflow_run, metrics, step=ep)

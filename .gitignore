@@ -13,6 +13,7 @@ venv/
 *.pth
 checkpoints/
 outputs/
+/results/
 multirun/
 /wandb/
 /mlruns/
@@ -27,3 +28,6 @@ artifact-smoke-model.txt
 
 # Git worktrees
 .worktrees/
+
+# Standalone external-work repositories.
+/external_work/rl_recsys_literature_2021_2026/
