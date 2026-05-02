@@ -52,6 +52,27 @@ class KuaiRecPipeline(BasePipeline):
         validate_parquet_schema(out, "interactions")
         print(f"Saved {len(df):,} rows to {out}")
 
+        cats_file = self.raw_dir / "KuaiRec 2.0" / "data" / "item_categories.csv"
+        if cats_file.exists():
+            self._process_item_features(cats_file)
+        else:
+            print(f"item_categories.csv not found at {cats_file}; skipping item_features.parquet")
+
+    def _process_item_features(self, cats_file: Path) -> None:
+        import ast
+        cats = pd.read_csv(cats_file).rename(columns={"video_id": "item_id"})
+        if "feat" in cats.columns:
+            cats["feat"] = cats["feat"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+            )
+            all_cats = sorted({c for feats in cats["feat"] for c in feats})
+            for cat in all_cats:
+                cats[f"cat_{cat}"] = cats["feat"].apply(lambda x: int(cat in x))
+            cats = cats.drop(columns=["feat"])
+        out = self.processed_dir / "item_features.parquet"
+        cats.to_parquet(out, index=False)
+        print(f"Saved {len(cats):,} item feature rows to {out}")
+
 
 from rl_recsys.data.registry import register  # noqa: E402
 
