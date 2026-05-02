@@ -24,6 +24,7 @@ RecEnv (existing)
 
 | File | Contents |
 |---|---|
+| `rl_recsys/environments/features.py` | Shared `hashed_vector()` utility (moved from `logged.py`) |
 | `rl_recsys/environments/dataset_base.py` | `BanditDatasetEnv`, `SessionDatasetEnv` |
 | `rl_recsys/environments/kuairec.py` | `KuaiRecEnv` |
 | `rl_recsys/environments/finn_no_slate.py` | `FinnNoSlateEnv` |
@@ -33,6 +34,7 @@ RecEnv (existing)
 
 | File | Change |
 |---|---|
+| `rl_recsys/environments/logged.py` | Import `hashed_vector` from `features.py` instead of defining it locally |
 | `rl_recsys/data/pipelines/kuairec.py` | Emit `item_features.parquet` alongside `interactions.parquet` |
 | `rl_recsys/data/pipelines/rl4rs.py` | Replace placeholder with proper `sessions.parquet` output |
 
@@ -67,11 +69,23 @@ BanditDatasetEnv(
 - `reset()`: sample one row uniformly, treat `row["item_id"]` as the positive item, sample `num_candidates - 1` negatives from the global item pool (excluding known positives for that user), shuffle into `candidate_ids`, return `RecObs`
 - `step(slate)`: check which slate positions contain the positive item, call `_compute_reward(row, clicks) -> float`, return `RecStep(done=True)`
 
-**Feature source:**
-- `"hashed"`: uses `_hashed_vector(prefix, entity_id, dim)` — same approach as `LoggedInteractionEnv`
-- `"native"`: expects subclass to populate `self._native_user_features: dict[int, np.ndarray]` and `self._native_item_features: dict[int, np.ndarray]` before calling `super().__init__`; raises `ValueError` if these are not populated
+**Feature source — protected methods:**
 
-**Abstract method:**
+Both base classes delegate observation construction to two protected methods that subclasses can override:
+
+```python
+def _get_user_features(self, row: pd.Series) -> np.ndarray:
+    # default: hashed vector keyed on row["user_id"]
+    ...
+
+def _get_item_features(self, row: pd.Series, candidate_ids: np.ndarray) -> np.ndarray:
+    # default: stack hashed vectors for each candidate_id
+    ...
+```
+
+For `feature_source="hashed"` the default implementations suffice. For `feature_source="native"` subclasses override these methods to read from pre-loaded feature dicts or directly from `row` columns (e.g. `RL4RSEnv` reads `row["user_state"]` and `row["item_features"]`). This avoids requiring subclasses to populate dicts before `super().__init__`, and supports both global lookup tables and per-row dynamic features without base-class branching.
+
+**Abstract methods:**
 ```python
 @abstractmethod
 def _compute_reward(self, row: pd.Series, clicks: np.ndarray) -> float: ...
@@ -100,19 +114,21 @@ SessionDatasetEnv(
 )
 ```
 
-`sessions` is a mapping from session ID to a DataFrame of that session's steps, ordered by step index. Each row must contain `slate` (item ID list), `clicks` (binary list), and optionally `user_state` (pre-computed vector) for native features.
+`sessions` is a mapping from session ID to a DataFrame of that session's steps, ordered by step index. Each row must contain `slate` (item ID list) and `clicks` (binary list).
 
 **Episode structure:**
-- `reset()`: pick a session uniformly, set cursor to step 0, return `RecObs` for step 0
+- `reset()`: pick a session uniformly, set cursor to step 0, call `_get_user_features(row)` and `_get_item_features(row, candidate_ids)` to build `RecObs`
 - `step(slate)`: compute reward for current step via `_compute_reward`, advance cursor, return `RecStep(done=(cursor == len(session)))`
 
-**Feature source:** same contract as `BanditDatasetEnv`.
+**Feature source:** same `_get_user_features` / `_get_item_features` override contract as `BanditDatasetEnv`.
 
 **Abstract method:**
 ```python
 @abstractmethod
 def _compute_reward(self, row: pd.Series, clicks: np.ndarray) -> float: ...
 ```
+
+**Memory note:** Both base classes load the full dataset into memory as pandas DataFrames at construction time. This is a V1 limitation — datasets that don't fit in RAM are out of scope.
 
 ---
 
@@ -138,14 +154,18 @@ Loads `{processed_dir}/interactions.parquet` (columns: `user_id`, `item_id`, `ra
 **Reward:**
 ```python
 def _compute_reward(self, row, clicks) -> float:
-    return float(row["rating"]) * float(clicks[0])
+    return float(row["rating"]) * float(clicks.sum())
 ```
 
-Watch-ratio (0–1) is returned only when the agent clicks the positive item.
+Watch-ratio (0–1) is scaled by whether the positive item appears anywhere in the agent's recommended slate. Using `clicks.sum()` is consistent with the other environments and correct for `slate_size > 1`.
+
+**Native features:**
+
+KuaiRec has no user metadata — user IDs are anonymous. For `feature_source="native"`, `KuaiRecEnv` overrides `_get_item_features` to use item category/tag vectors loaded from `item_features.parquet`, but keeps the hashed-vector default for `_get_user_features`. This partial-native behaviour is documented in the constructor docstring.
 
 **KuaiRec pipeline update (`kuairec.py`):**
 
-The existing pipeline emits only `interactions.parquet`. It must also load `KuaiRec 2.0/data/item_categories.csv` and write `item_features.parquet` with columns `item_id` plus one column per category/tag. `KuaiRecEnv` loads this file for native features. If the file is absent and `feature_source="native"` is requested, `KuaiRecEnv` raises `FileNotFoundError` with a message instructing the user to rerun `--process`.
+The existing pipeline emits only `interactions.parquet`. It must also load `KuaiRec 2.0/data/item_categories.csv` and write `item_features.parquet` with columns `item_id` plus one column per category/tag. `KuaiRecEnv` loads this file for native item features. If the file is absent and `feature_source="native"` is requested, `KuaiRecEnv` raises `FileNotFoundError` with a message instructing the user to rerun `--process`.
 
 ---
 
@@ -191,7 +211,7 @@ RL4RSEnv(
 )
 ```
 
-Loads `{processed_dir}/sessions.parquet` and groups by `session_id` to build the `sessions` dict passed to `SessionDatasetEnv`.
+Loads `{processed_dir}/sessions.parquet` and groups by `session_id` to build the `sessions` dict passed to `SessionDatasetEnv`. `num_candidates` is fixed to the logged slate size in the data (determined at load time from the length of the first `slate` list); passing a different value raises `ValueError`. This mirrors `FinnNoSlateEnv`'s approach and is required because `item_features` in each row contains exactly the feature matrix for the logged slate — there is no global item feature store to sample additional candidates from.
 
 **Expected `sessions.parquet` schema** (produced by the updated RL4RS pipeline):
 
