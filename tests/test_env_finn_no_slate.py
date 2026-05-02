@@ -71,4 +71,27 @@ def test_native_fallback_warns(tmp_path):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         FinnNoSlateEnv(tmp_path, feature_dim=8, feature_source="native", seed=0)
-    assert any("hashed" in str(x.message).lower() or "native" in str(x.message).lower() for x in w)
+    assert any(
+        issubclass(x.category, UserWarning) and "hashed" in str(x.message).lower()
+        for x in w
+    )
+
+
+def test_reward_one_when_positive_selected(tmp_path):
+    _slates().to_parquet(tmp_path / "slates.parquet", index=False)
+    env = FinnNoSlateEnv(tmp_path, slate_size=1, feature_dim=8, seed=0)
+    obs = env.reset(seed=0)
+    positive_id = int(env._current_row["item_id"])
+    idx = int(np.where(obs.candidate_ids == positive_id)[0][0])
+    step = env.step(np.array([idx]))
+    assert step.reward == 1.0
+
+
+def test_reward_zero_when_positive_not_selected(tmp_path):
+    _slates().to_parquet(tmp_path / "slates.parquet", index=False)
+    env = FinnNoSlateEnv(tmp_path, slate_size=1, feature_dim=8, seed=0)
+    obs = env.reset(seed=0)
+    positive_id = int(env._current_row["item_id"])
+    non_positive = np.where(obs.candidate_ids != positive_id)[0]
+    step = env.step(np.array([non_positive[0]]))
+    assert step.reward == 0.0

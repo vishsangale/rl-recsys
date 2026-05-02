@@ -34,8 +34,17 @@ class FinnNoSlateEnv(BanditDatasetEnv):
             feature_source = "hashed"
 
         df = df.copy()
+        invalid_clicks = (df["clicks"] < 0) | (df["clicks"] >= self._LOGGED_SLATE_SIZE)
+        if invalid_clicks.any():
+            raise ValueError(
+                f"Found {invalid_clicks.sum()} rows with clicks index outside [0, {self._LOGGED_SLATE_SIZE})"
+            )
+        bad_length = df["slate"].apply(len) != self._LOGGED_SLATE_SIZE
+        if bad_length.any():
+            raise ValueError(
+                f"Found {bad_length.sum()} rows where slate length != {self._LOGGED_SLATE_SIZE}"
+            )
         df["item_id"] = df.apply(lambda r: r["slate"][int(r["clicks"])], axis=1)
-        df["rating"] = 1.0
 
         super().__init__(
             df,
