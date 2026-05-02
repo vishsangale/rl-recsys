@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tarfile
 from pathlib import Path
 
@@ -11,23 +12,21 @@ from rl_recsys.data.pipelines.base import BasePipeline
 
 
 class RL4RSPipeline(BasePipeline):
-    """Pipeline for downloading and processing the RL4RS dataset."""
-
     DATASET_URL = "https://zenodo.org/record/6622390/files/rl4rs-dataset.tar.gz"
 
-    def __init__(self, raw_dir: str | Path = "data/raw/rl4rs",
-                 processed_dir: str | Path = "data/processed/rl4rs") -> None:
+    def __init__(
+        self,
+        raw_dir: str | Path = "data/raw/rl4rs",
+        processed_dir: str | Path = "data/processed/rl4rs",
+    ) -> None:
         super().__init__(raw_dir, processed_dir)
 
     def download(self) -> None:
-        """Download and extract the RL4RS dataset."""
         archive_path = self.raw_dir / "rl4rs-dataset.tar.gz"
-
         if not archive_path.exists():
             print(f"Downloading RL4RS dataset from {self.DATASET_URL}...")
             response = requests.get(self.DATASET_URL, stream=True)
             total_size = int(response.headers.get("content-length", 0))
-
             with open(archive_path, "wb") as f, tqdm(
                 total=total_size, unit="iB", unit_scale=True
             ) as pbar:
@@ -36,33 +35,77 @@ class RL4RSPipeline(BasePipeline):
                     pbar.update(size)
         else:
             print(f"Archive found at {archive_path}, skipping download.")
-
-        # Extract
         print(f"Extracting to {self.raw_dir}...")
         with tarfile.open(archive_path, "r:gz") as tar:
             tar.extractall(path=self.raw_dir)
         print("Done.")
 
     def process(self) -> None:
-        """Process RL4RS slate data into standard Parquet files."""
-        # Find the _sl.csv and _rl.csv files in the extracted dir
-        # Based on search: rl4rs-dataset/rl4rs_dataset_a_sl.csv
-        slate_dir = self.raw_dir / "rl4rs-dataset"
-        sl_file = slate_dir / "rl4rs_dataset_a_sl.csv"
-        rl_file = slate_dir / "rl4rs_dataset_a_rl.csv"
+        rl_file = self.raw_dir / "rl4rs-dataset" / "rl4rs_dataset_a_rl.csv"
+        if not rl_file.exists():
+            raise FileNotFoundError(
+                f"Not found: {rl_file}. Run --download first."
+            )
+        df = pd.read_csv(rl_file)
+        cols = _detect_columns(df)
 
-        if not sl_file.exists():
-            raise FileNotFoundError(f"Could not find {sl_file}. Check extraction.")
+        df["step"] = df.groupby(cols["session_id"]).cumcount()
+        df["user_state"] = df[cols["user_feat"]].values.tolist()
+        df["slate"] = df[cols["item_id"]].values.tolist()
+        n_items = len(cols["item_id"])
+        df["item_features"] = [
+            [row[cols["item_feat"][i]].tolist() for i in range(n_items)]
+            for _, row in df.iterrows()
+        ]
+        df["clicks"] = df[cols["click"]].values.tolist()
 
-        print(f"Processing {sl_file}...")
-        df_sl = pd.read_csv(sl_file)
-        # Placeholder for real preprocessing (e.g. normalization, encoding)
-        df_sl.to_parquet(self.processed_dir / "slate_train.parquet", index=False)
+        out_df = df[
+            [cols["session_id"], "step", "user_state", "slate", "item_features", "clicks"]
+        ].rename(columns={cols["session_id"]: "session_id"})
+        out = self.processed_dir / "sessions.parquet"
+        out_df.to_parquet(out, index=False)
+        print(f"Saved {len(out_df):,} rows ({out_df['session_id'].nunique():,} sessions) to {out}")
 
-        print(f"Processing {rl_file}...")
-        df_rl = pd.read_csv(rl_file)
-        df_rl.to_parquet(self.processed_dir / "slate_eval.parquet", index=False)
-        print(f"Processed data saved to {self.processed_dir}")
+
+def _detect_columns(df: pd.DataFrame) -> dict:
+    user_feat = sorted(
+        [c for c in df.columns if re.match(r"^user_feat_\d+$", c)],
+        key=lambda x: int(x.split("_")[-1]),
+    )
+    item_id = sorted(
+        [c for c in df.columns if re.match(r"^item_id_\d+$", c)],
+        key=lambda x: int(x.split("_")[-1]),
+    )
+    n_items = len(item_id)
+    item_feat = [
+        sorted(
+            [c for c in df.columns if re.match(rf"^item_{i}_feat_\d+$", c)],
+            key=lambda x: int(x.split("_")[-1]),
+        )
+        for i in range(n_items)
+    ]
+    click = sorted(
+        [c for c in df.columns if re.match(r"^click_\d+$", c)],
+        key=lambda x: int(x.split("_")[-1]),
+    )
+    session_id = "session_id"
+    if session_id not in df.columns:
+        raise ValueError(
+            f"'session_id' column not found in CSV. Available columns: {list(df.columns)}"
+        )
+    if not user_feat:
+        raise ValueError("No user_feat_N columns found in CSV.")
+    if not item_id:
+        raise ValueError("No item_id_N columns found in CSV.")
+    if not click:
+        raise ValueError("No click_N columns found in CSV.")
+    return {
+        "session_id": session_id,
+        "user_feat": user_feat,
+        "item_id": item_id,
+        "item_feat": item_feat,
+        "click": click,
+    }
 
 
 from rl_recsys.data.registry import register  # noqa: E402
