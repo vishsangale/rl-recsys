@@ -43,9 +43,21 @@ def test_reward_in_zero_one(tmp_path):
     _interactions().to_parquet(tmp_path / "interactions.parquet", index=False)
     env = KuaiRecEnv(tmp_path, slate_size=1, num_candidates=10, feature_dim=8, feature_source="hashed", seed=0)
     for seed in range(20):
-        env.reset(seed=seed)
-        step = env.step(np.arange(10))
+        obs = env.reset(seed=seed)
+        step = env.step(np.array([0]))
         assert 0.0 <= step.reward <= 1.0
+
+
+def test_reward_bounded_when_rating_exceeds_one(tmp_path):
+    # watch_ratio > 1.0 occurs in real KuaiRec for replayed videos; pipeline must clip
+    df = _interactions()
+    df["rating"] = 2.5
+    df.to_parquet(tmp_path / "interactions.parquet", index=False)
+    env = KuaiRecEnv(tmp_path, slate_size=1, num_candidates=10, feature_dim=8, feature_source="hashed", seed=0)
+    for seed in range(5):
+        env.reset(seed=seed)
+        step = env.step(np.array([0]))
+        assert step.reward <= 1.0
 
 
 def test_native_raises_without_item_features(tmp_path):

@@ -31,6 +31,7 @@ def test_process_produces_correct_schema(tmp_path):
     assert df["user_id"].dtype.kind in ("i", "u")
     assert df["item_id"].dtype.kind in ("i", "u")
     assert df["rating"].ge(0.0).all()
+    assert df["rating"].le(1.0).all()
 
 
 def test_kuairec_is_registered():

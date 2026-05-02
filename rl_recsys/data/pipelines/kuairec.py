@@ -43,10 +43,11 @@ class KuaiRecPipeline(BasePipeline):
         df = df.rename(
             columns={
                 "video_id": "item_id",
-                "watch_ratio": "rating",
                 "time": "timestamp",
             }
         )
+        df["rating"] = pd.to_numeric(df["watch_ratio"], errors="coerce").clip(0.0, 1.0)
+        df = df.drop(columns=["watch_ratio"])
 
         out = self.processed_dir / "interactions.parquet"
         df[["user_id", "item_id", "rating", "timestamp"]].to_parquet(out, index=False)

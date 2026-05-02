@@ -22,6 +22,7 @@ class KuaiRecEnv(BanditDatasetEnv):
     ) -> None:
         processed_dir = Path(processed_dir)
         interactions = pd.read_parquet(processed_dir / "interactions.parquet")
+        interactions["rating"] = interactions["rating"].clip(0.0, 1.0)
 
         self._native_item_feat_map: dict[int, np.ndarray] | None = None
         if feature_source == "native":
