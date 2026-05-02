@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from rl_recsys.environments.base import RecEnv, RecObs, RecStep
+from rl_recsys.environments.features import hashed_vector as _hashed_vector
 
 
 class LoggedInteractionEnv(RecEnv):
@@ -146,6 +147,3 @@ class LoggedInteractionEnv(RecEnv):
             vec[2] = float(stats["mean"])
             features[int(entity_id)] = vec.astype(np.float32)
         return features
-
-
-from rl_recsys.environments.features import hashed_vector as _hashed_vector
