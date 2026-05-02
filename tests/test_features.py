@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from rl_recsys.environments.features import hashed_vector
 
@@ -21,4 +23,10 @@ def test_hashed_vector_deterministic():
 def test_hashed_vector_differs_by_prefix():
     v1 = hashed_vector("user", 1, 16)
     v2 = hashed_vector("item", 1, 16)
+    assert not np.allclose(v1, v2)
+
+
+def test_hashed_vector_differs_by_entity_id():
+    v1 = hashed_vector("user", 1, 16)
+    v2 = hashed_vector("user", 2, 16)
     assert not np.allclose(v1, v2)

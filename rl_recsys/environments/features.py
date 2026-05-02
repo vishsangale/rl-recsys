@@ -11,7 +11,7 @@ def hashed_vector(prefix: str, entity_id: int, dim: int) -> np.ndarray:
     )
     seed = int.from_bytes(digest.digest(), byteorder="little", signed=False)
     rng = np.random.default_rng(seed)
-    vec = rng.standard_normal(dim).astype(np.float64)
+    vec = rng.standard_normal(dim)
     norm = np.linalg.norm(vec)
     if norm > 0:
         vec /= norm
