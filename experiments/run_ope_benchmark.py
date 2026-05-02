@@ -54,6 +54,7 @@ def main() -> None:
             df,
             num_candidates=args.num_candidates,
             feature_dim=args.feature_dim,
+            feature_source=args.feature_source,
             seed=args.seed,
         )
         agent_cfg = AgentConfig(name=agent_name, alpha=args.alpha)
@@ -84,13 +85,16 @@ def main() -> None:
                 "campaigns": ",".join(sorted(map(str, df["campaign"].unique()))),
                 "num_candidates": args.num_candidates,
                 "feature_dim": args.feature_dim,
+                "feature_source": args.feature_source,
                 "seed": args.seed,
             }
         )
         rows.append(row)
 
     summary = pd.DataFrame(rows)
-    output_dir = args.output_dir / datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    output_dir = args.output_dir / datetime.now(timezone.utc).strftime(
+        "%Y%m%d_%H%M%S_%f"
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "summary.csv"
     summary.to_csv(output_path, index=False)
@@ -118,6 +122,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=2000)
     parser.add_argument("--num-candidates", type=int, default=50)
     parser.add_argument("--feature-dim", type=int, default=16)
+    parser.add_argument(
+        "--feature-source",
+        choices=["native", "hashed"],
+        default="native",
+        help="Open Bandit feature source. Native uses preserved context columns.",
+    )
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-rows", type=int, default=None)

@@ -41,6 +41,11 @@ python experiments/run_ope_benchmark.py \
   --dataset open-bandit \
   --download --process
 
+# Compare against the older hashed-feature path
+python experiments/run_ope_benchmark.py \
+  --dataset open-bandit \
+  --feature-source hashed
+
 # Run across every processed Open Bandit policy and campaign split
 python experiments/run_ope_benchmark.py \
   --dataset open-bandit \
@@ -101,10 +106,11 @@ off-policy evaluation data. See [docs/datasets.md](docs/datasets.md) for the
 full catalog and guidance on which dataset to use.
 
 Open Bandit is the first supported logged-policy benchmark path. It preserves
-`propensity_score`, `policy`, and `campaign`, so
+`propensity_score`, `policy`, `campaign`, and native context columns, so
 `experiments/run_ope_benchmark.py` can report replay, IPS, and self-normalized
 IPS estimates for top-1 target policies on one slice or across all processed
-splits.
+splits. Native Open Bandit context is the default feature source; use
+`--feature-source hashed` for the previous grouped/hash baseline.
 
 ## Architecture
 

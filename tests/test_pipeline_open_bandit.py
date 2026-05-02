@@ -16,15 +16,26 @@ def test_process_produces_correct_schema(tmp_path):
     random_all_dir = raw_dir / "open_bandit_dataset" / "random" / "all"
     random_all_dir.mkdir(parents=True)
     (random_all_dir / "all.csv").write_text(
-        "timestamp,item_id,position,click,propensity_score,user_feature_0\n"
-        "1609459200,42,0,1,0.33,0.5\n"
-        "1609459260,43,1,0,0.33,0.7\n"
+        ",timestamp,item_id,position,click,propensity_score,user_feature_0,"
+        "user-item_affinity_42,user-item_affinity_43\n"
+        "0,1609459200,42,0,1,0.33,u0,0.9,0.1\n"
+        "1,1609459260,43,1,0,0.33,u1,0.2,0.8\n"
+    )
+    (random_all_dir / "item_context.csv").write_text(
+        ",item_id,item_feature_0,item_feature_1\n"
+        "0,42,0.5,c42\n"
+        "1,43,0.7,c43\n"
     )
     bts_women_dir = raw_dir / "open_bandit_dataset" / "bts" / "women"
     bts_women_dir.mkdir(parents=True)
     (bts_women_dir / "women.csv").write_text(
-        "timestamp,item_id,position,click,propensity_score,user_feature_0\n"
-        "1609459320,44,2,1,0.25,0.2\n"
+        "timestamp,item_id,position,click,propensity_score,user_feature_0,"
+        "user-item_affinity_44\n"
+        "1609459320,44,2,1,0.25,u2,0.6\n"
+    )
+    (bts_women_dir / "item_context.csv").write_text(
+        "item_id,item_feature_0,item_feature_1\n"
+        "44,0.9,c44\n"
     )
     proc_dir = tmp_path / "proc"
     p = OpenBanditPipeline(
@@ -44,6 +55,14 @@ def test_process_produces_correct_schema(tmp_path):
     assert (df["user_id"] == 0).all()
     assert set(df["policy"]) == {"random", "bts"}
     assert set(df["campaign"]) == {"all", "women"}
+    assert "Unnamed: 0" not in df.columns
+    assert set(df.columns) >= {"user_feature_0", "item_feature_0", "item_feature_1"}
+    assert set(df.columns) >= {
+        "user_item_affinity_42",
+        "user_item_affinity_43",
+        "user_item_affinity_44",
+    }
+    assert df.loc[df["item_id"] == 42, "item_feature_1"].iloc[0] == "c42"
 
 
 def test_open_bandit_is_registered():

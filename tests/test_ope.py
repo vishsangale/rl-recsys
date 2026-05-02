@@ -23,6 +23,25 @@ def _open_bandit_rows() -> pd.DataFrame:
     )
 
 
+def _native_open_bandit_rows() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "user_id": [0, 0, 0, 0],
+            "item_id": [0, 1, 0, 1],
+            "rating": [1.0, 0.0, 0.0, 1.0],
+            "timestamp": [1, 2, 3, 4],
+            "propensity_score": [0.5, 0.5, 0.5, 0.5],
+            "policy": ["random", "random", "random", "random"],
+            "campaign": ["all", "all", "men", "men"],
+            "user_feature_0": ["u0", "u0", "u1", "u1"],
+            "item_feature_0": [0.1, 0.2, 0.9, 0.8],
+            "item_feature_1": ["i0a", "i1a", "i0m", "i1m"],
+            "user_item_affinity_0": [0.9, 0.9, 0.2, 0.2],
+            "user_item_affinity_1": [0.1, 0.1, 0.8, 0.8],
+        }
+    )
+
+
 def test_replay_value_averages_exact_matches_only() -> None:
     rewards = np.array([1.0, 0.0, 1.0])
     matches = np.array([True, False, True])
@@ -67,6 +86,53 @@ def test_open_bandit_event_sampler_contains_logged_item_once() -> None:
     assert event.obs.candidate_ids.shape == (4,)
     assert int(np.sum(event.obs.candidate_ids == event.logged_item_id)) == 1
     assert event.obs.candidate_ids[event.logged_action] == event.logged_item_id
+
+
+def test_open_bandit_event_sampler_uses_native_context_when_available() -> None:
+    sampler = OpenBanditEventSampler(
+        _native_open_bandit_rows(),
+        num_candidates=2,
+        feature_dim=8,
+        feature_source="native",
+        seed=0,
+    )
+
+    event = sampler.sample_event(seed=2)
+
+    assert event.obs.user_features.shape == (8,)
+    assert event.obs.candidate_features.shape == (2, 8)
+    assert event.campaign in {"all", "men"}
+    assert set(event.obs.candidate_ids.tolist()) == {0, 1}
+    assert not np.allclose(event.obs.candidate_features[0], event.obs.candidate_features[1])
+
+
+def test_open_bandit_event_sampler_supports_hashed_feature_source() -> None:
+    sampler = OpenBanditEventSampler(
+        _native_open_bandit_rows(),
+        num_candidates=2,
+        feature_dim=8,
+        feature_source="hashed",
+        seed=0,
+    )
+
+    event = sampler.sample_event(seed=2)
+
+    assert event.obs.user_features.shape == (8,)
+    assert event.obs.candidate_features.shape == (2, 8)
+
+
+def test_open_bandit_event_sampler_rejects_unknown_feature_source() -> None:
+    try:
+        OpenBanditEventSampler(
+            _open_bandit_rows(),
+            num_candidates=4,
+            feature_dim=8,
+            feature_source="missing",
+        )
+    except ValueError as exc:
+        assert "feature_source" in str(exc)
+    else:
+        raise AssertionError("expected invalid feature_source to raise")
 
 
 def test_open_bandit_event_sampler_is_seed_deterministic() -> None:
