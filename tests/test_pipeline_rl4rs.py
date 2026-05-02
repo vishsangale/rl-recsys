@@ -76,6 +76,25 @@ def test_sessions_parquet_list_shapes(tmp_path):
     assert len(row["clicks"]) == 3        # 3 click labels
 
 
+def test_sessions_parquet_value_wiring(tmp_path):
+    raw_dir = tmp_path / "raw" / "rl4rs-dataset"
+    raw_dir.mkdir(parents=True)
+    csv_path = raw_dir / "rl4rs_dataset_a_rl.csv"
+    _write_rl_csv(csv_path, n_sessions=2, n_steps=3)
+    proc_dir = tmp_path / "proc"
+    RL4RSPipeline(raw_dir=str(tmp_path / "raw"), processed_dir=str(proc_dir)).process()
+
+    raw_df = pd.read_csv(csv_path)
+    first_raw = raw_df.iloc[0]
+    df = pd.read_parquet(proc_dir / "sessions.parquet")
+    first = df.iloc[0]
+
+    assert first["slate"][0] == first_raw["item_id_0"]
+    assert first["user_state"][0] == pytest.approx(first_raw["user_feat_0"])
+    assert first["item_features"][0][0] == pytest.approx(first_raw["item_0_feat_0"])
+    assert first["clicks"][0] == first_raw["click_0"]
+
+
 def test_rl4rs_is_registered():
     import rl_recsys.data.pipelines.rl4rs  # noqa: F401
     from rl_recsys.data.registry import _REGISTRY

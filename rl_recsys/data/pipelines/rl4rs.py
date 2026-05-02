@@ -4,6 +4,7 @@ import re
 import tarfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 from tqdm import tqdm
@@ -53,10 +54,10 @@ class RL4RSPipeline(BasePipeline):
         df["user_state"] = df[cols["user_feat"]].values.tolist()
         df["slate"] = df[cols["item_id"]].values.tolist()
         n_items = len(cols["item_id"])
-        df["item_features"] = [
-            [row[cols["item_feat"][i]].tolist() for i in range(n_items)]
-            for _, row in df.iterrows()
-        ]
+        arr = np.stack(
+            [df[cols["item_feat"][i]].to_numpy() for i in range(n_items)], axis=1
+        )
+        df["item_features"] = arr.tolist()
         df["clicks"] = df[cols["click"]].values.tolist()
 
         out_df = df[
