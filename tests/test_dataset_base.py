@@ -76,7 +76,19 @@ def test_bandit_properties():
 
 def test_bandit_positive_item_in_candidates():
     env = _SimpleBanditEnv(_interactions(), slate_size=1, num_candidates=10, feature_dim=8, feature_source="hashed", seed=7)
-    obs = env.reset(seed=7)
-    # Selecting all candidates must hit the positive item at least once
+    env.reset(seed=7)
     step = env.step(np.arange(10))
     assert step.clicks.sum() >= 1.0
+
+
+def test_bandit_invalid_feature_source_raises():
+    with pytest.raises(ValueError, match="feature_source"):
+        _SimpleBanditEnv(_interactions(), num_candidates=10, feature_dim=4, feature_source="bad")
+
+
+def test_bandit_candidate_fallback_when_user_has_all_items():
+    # User 0 has interacted with all 20 items; fallback relaxes exclusion pool
+    df = _interactions(n_users=1, n_items=20)
+    env = _SimpleBanditEnv(df, slate_size=1, num_candidates=5, feature_dim=4, feature_source="hashed", seed=0)
+    obs = env.reset(seed=0)
+    assert obs.candidate_ids.shape == (5,)
