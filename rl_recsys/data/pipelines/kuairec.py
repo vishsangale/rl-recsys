@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import zipfile
 from pathlib import Path
 
@@ -59,11 +60,10 @@ class KuaiRecPipeline(BasePipeline):
             print(f"item_categories.csv not found at {cats_file}; skipping item_features.parquet")
 
     def _process_item_features(self, cats_file: Path) -> None:
-        import ast
         cats = pd.read_csv(cats_file).rename(columns={"video_id": "item_id"})
         if "feat" in cats.columns:
             cats["feat"] = cats["feat"].apply(
-                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+                lambda x: ast.literal_eval(x) if isinstance(x, str) and x.strip() else []
             )
             all_cats = sorted({c for feats in cats["feat"] for c in feats})
             for cat in all_cats:
