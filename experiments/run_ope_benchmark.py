@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as pad
 import pyarrow.parquet as pq
 
 from rl_recsys.agents import LinUCBAgent, RandomAgent
@@ -38,9 +40,13 @@ def main() -> None:
     if not path.exists():
         raise FileNotFoundError(f"processed dataset not found: {path}")
 
-    df = _load_open_bandit_interactions(path, policy=args.policy, campaign=args.campaign)
-    if args.max_rows is not None and len(df) > args.max_rows:
-        df = df.sample(n=args.max_rows, random_state=args.seed).reset_index(drop=True)
+    df = _load_open_bandit_interactions(
+        path,
+        policy=args.policy,
+        campaign=args.campaign,
+        max_rows=args.max_rows,
+        seed=args.seed,
+    )
 
     env_cfg = EnvConfig(
         num_candidates=args.num_candidates,
@@ -149,6 +155,8 @@ def _load_open_bandit_interactions(
     *,
     policy: str,
     campaign: str,
+    max_rows: int | None = None,
+    seed: int = 0,
 ) -> pd.DataFrame:
     schema_names = set(pq.read_schema(path).names)
     has_split_metadata = {"policy", "campaign"}.issubset(schema_names)
@@ -159,7 +167,7 @@ def _load_open_bandit_interactions(
                 "processed Open Bandit file has no policy/campaign columns; "
                 "rerun with --process before filtering non-default splits"
             )
-        df = pd.read_parquet(path)
+        df = _read_parquet_capped(path, filters=None, max_rows=max_rows, seed=seed)
         df["policy"] = DEFAULT_POLICY
         df["campaign"] = DEFAULT_CAMPAIGN
         return df
@@ -170,12 +178,40 @@ def _load_open_bandit_interactions(
     if campaign != "any":
         filters.append(("campaign", "==", campaign))
 
-    df = pd.read_parquet(path, filters=filters or None)
+    df = _read_parquet_capped(path, filters=filters or None, max_rows=max_rows, seed=seed)
     if df.empty:
         raise ValueError(
             f"no Open Bandit rows matched policy={policy!r}, campaign={campaign!r}"
         )
     return df.reset_index(drop=True)
+
+
+def _read_parquet_capped(
+    path: Path,
+    *,
+    filters: list[tuple[str, str, str]] | None,
+    max_rows: int | None,
+    seed: int,
+) -> pd.DataFrame:
+    if max_rows is None:
+        return pd.read_parquet(path, filters=filters)
+    if filters:
+        exprs = [pad.field(col) == val for col, _, val in filters]
+        expr = exprs[0]
+        for e in exprs[1:]:
+            expr = expr & e
+    else:
+        expr = None
+    ds = pad.dataset(path, format="parquet")
+    scanner = ds.scanner(filter=expr)
+    total = scanner.count_rows()
+    if total <= max_rows:
+        return scanner.to_table().to_pandas()
+    rng = pa.array(
+        sorted(__import__("random").Random(seed).sample(range(total), max_rows))
+    )
+    table = scanner.take(rng)
+    return table.to_pandas().reset_index(drop=True)
 
 
 if __name__ == "__main__":
