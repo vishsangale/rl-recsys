@@ -160,3 +160,45 @@ def test_session_next_obs_shape_mid_session():
     step = env.step(np.array([0, 1, 2]))
     assert step.obs.user_features.shape == (4,)
     assert step.obs.candidate_features.shape == (3, 4)
+
+
+def test_session_clicks_match_logged_by_index():
+    # Verify click derivation is index-based, not item-ID-based
+    rng = np.random.default_rng(0)
+    sessions = {
+        0: pd.DataFrame([
+            {"slate": [10, 20, 30], "item_features": rng.standard_normal((3, 4)).tolist(),
+             "clicks": [0, 0, 1], "user_state": rng.standard_normal(4).tolist()},
+        ])
+    }
+    env = _SimpleSessionEnv(sessions, slate_size=1, num_candidates=3, feature_dim=4, feature_source="hashed", seed=0)
+    env.reset(seed=0)
+    step = env.step(np.array([2]))  # pick index 2 (item 30, the clicked one)
+    assert step.clicks[0] == 1.0
+    env.reset(seed=0)
+    step = env.step(np.array([0]))  # pick index 0 (item 10, not clicked)
+    assert step.clicks[0] == 0.0
+
+
+def test_session_cursor_resets_on_new_episode():
+    env = _SimpleSessionEnv(_sessions(n_steps=2), slate_size=3, num_candidates=3, feature_dim=4, feature_source="hashed", seed=0)
+    env.reset(seed=0)
+    env.step(np.array([0, 1, 2]))
+    env.step(np.array([0, 1, 2]))  # done=True
+    env.reset(seed=0)             # new episode: cursor must be 0
+    step = env.step(np.array([0, 1, 2]))
+    assert step.done is False     # mid-session again, not immediately done
+
+
+def test_session_single_step_done_immediately():
+    rng = np.random.default_rng(0)
+    sessions = {
+        0: pd.DataFrame([
+            {"slate": [1, 2, 3], "item_features": rng.standard_normal((3, 4)).tolist(),
+             "clicks": [1, 0, 0], "user_state": rng.standard_normal(4).tolist()},
+        ])
+    }
+    env = _SimpleSessionEnv(sessions, slate_size=3, num_candidates=3, feature_dim=4, feature_source="hashed", seed=0)
+    env.reset(seed=0)
+    step = env.step(np.array([0, 1, 2]))
+    assert step.done is True

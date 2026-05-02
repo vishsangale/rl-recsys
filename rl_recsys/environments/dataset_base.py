@@ -198,10 +198,8 @@ class SessionDatasetEnv(RecEnv, ABC):
         row = self._current_session.iloc[self._cursor]
         candidate_ids = np.array(row["slate"], dtype=np.int64)
         slate = np.asarray(slate, dtype=np.int64)
-        selected_ids = candidate_ids[slate]
         logged_clicks = np.array(row["clicks"], dtype=np.float32)
-        clicked_ids = candidate_ids[logged_clicks > 0]
-        clicks = np.isin(selected_ids, clicked_ids).astype(np.float32)
+        clicks = logged_clicks[slate]
         reward = self._compute_reward(row, clicks)
         self._cursor += 1
         done = self._cursor >= len(self._current_session)
