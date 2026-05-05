@@ -83,6 +83,9 @@ def test_build_synthetic():
     assert isinstance(env, SyntheticEnv)
     assert env.slate_size == 3
     assert env.num_candidates == 10
+    obs = env.reset(seed=0)
+    assert obs.user_features.shape == (8,)
+    assert obs.candidate_features.shape == (10, 8)
 
 
 def test_build_kuairec(tmp_path):
@@ -95,6 +98,9 @@ def test_build_kuairec(tmp_path):
     env = build_env(cfg)
     assert isinstance(env, KuaiRecEnv)
     assert env.slate_size == 3
+    obs = env.reset(seed=0)
+    assert obs.user_features.ndim == 1
+    assert obs.candidate_features.ndim == 2
 
 
 def test_build_finn_no_slate(tmp_path):
@@ -106,6 +112,9 @@ def test_build_finn_no_slate(tmp_path):
     env = build_env(cfg)
     assert isinstance(env, FinnNoSlateEnv)
     assert env.slate_size == 5
+    obs = env.reset(seed=0)
+    assert obs.user_features.ndim == 1
+    assert obs.candidate_features.ndim == 2
 
 
 def test_build_rl4rs(tmp_path):
@@ -117,6 +126,9 @@ def test_build_rl4rs(tmp_path):
     env = build_env(cfg)
     assert isinstance(env, RL4RSEnv)
     assert env.slate_size == 3
+    obs = env.reset(seed=0)
+    assert obs.user_features.ndim == 1
+    assert obs.candidate_features.ndim == 2
 
 
 def test_build_logged(tmp_path):
@@ -130,6 +142,9 @@ def test_build_logged(tmp_path):
     env = build_env(cfg)
     assert isinstance(env, LoggedInteractionEnv)
     assert env.slate_size == 5
+    obs = env.reset(seed=0)
+    assert obs.user_features.ndim == 1
+    assert obs.candidate_features.ndim == 2
 
 
 def test_unknown_type_raises():
@@ -145,5 +160,5 @@ def test_logged_missing_file_raises(tmp_path):
         "slate_size": 5, "num_candidates": 20, "feature_dim": 8,
         "rating_threshold": 3.0, "seed": 0,
     })
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match="prepare_data"):
         build_env(cfg)

@@ -20,7 +20,12 @@ def build_env(cfg: DictConfig) -> RecEnv:
     The ``cfg.type`` field selects which environment to instantiate.
     Known types: ``synthetic``, ``kuairec``, ``finn_no_slate``, ``rl4rs``, ``logged``.
     """
-    env_type = str(cfg.get("type", "synthetic"))
+    if "type" not in cfg:
+        raise ValueError(
+            "cfg.env.type is required. "
+            "Known values: synthetic, kuairec, finn_no_slate, rl4rs, logged"
+        )
+    env_type = str(cfg["type"])
 
     if env_type == "synthetic":
         return SyntheticEnv(EnvConfig(
