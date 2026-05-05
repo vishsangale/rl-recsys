@@ -16,9 +16,9 @@ def test_process_produces_correct_schema(tmp_path):
     extracted = raw_dir / "KuaiRec 2.0" / "data"
     extracted.mkdir(parents=True)
     (extracted / "big_matrix.csv").write_text(
-        "user_id,video_id,play_duration,video_duration,time,date,watch_ratio\n"
-        "0,100,30.0,60.0,1609459200,2021-01-01,0.5\n"
-        "1,101,45.0,90.0,1609459260,2021-01-01,0.5\n"
+        "user_id,video_id,play_duration,video_duration,time,date,timestamp,watch_ratio\n"
+        "0,100,30.0,60.0,1609459200,2021-01-01,1609459200,0.5\n"
+        "1,101,45.0,90.0,1609459260,2021-01-01,1609459260,0.5\n"
     )
     proc_dir = tmp_path / "proc"
     p = KuaiRecPipeline(raw_dir=str(raw_dir), processed_dir=str(proc_dir))
@@ -45,9 +45,9 @@ def test_process_emits_item_features_parquet(tmp_path):
     extracted = raw_dir / "KuaiRec 2.0" / "data"
     extracted.mkdir(parents=True)
     (extracted / "big_matrix.csv").write_text(
-        "user_id,video_id,play_duration,video_duration,time,date,watch_ratio\n"
-        "0,100,30.0,60.0,1609459200,2021-01-01,0.5\n"
-        "1,101,45.0,90.0,1609459260,2021-01-01,0.5\n"
+        "user_id,video_id,play_duration,video_duration,time,date,timestamp,watch_ratio\n"
+        "0,100,30.0,60.0,1609459200,2021-01-01,1609459200,0.5\n"
+        "1,101,45.0,90.0,1609459260,2021-01-01,1609459260,0.5\n"
     )
     (extracted / "item_categories.csv").write_text(
         "video_id,feat\n"
@@ -75,8 +75,8 @@ def test_process_item_features_handles_missing_feat(tmp_path):
     extracted = raw_dir / "KuaiRec 2.0" / "data"
     extracted.mkdir(parents=True)
     (extracted / "big_matrix.csv").write_text(
-        "user_id,video_id,play_duration,video_duration,time,date,watch_ratio\n"
-        "0,100,30.0,60.0,1609459200,2021-01-01,0.5\n"
+        "user_id,video_id,play_duration,video_duration,time,date,timestamp,watch_ratio\n"
+        "0,100,30.0,60.0,1609459200,2021-01-01,1609459200,0.5\n"
     )
     (extracted / "item_categories.csv").write_text(
         "video_id,feat\n"
@@ -97,8 +97,8 @@ def test_process_skips_item_features_when_categories_absent(tmp_path):
     extracted = raw_dir / "KuaiRec 2.0" / "data"
     extracted.mkdir(parents=True)
     (extracted / "big_matrix.csv").write_text(
-        "user_id,video_id,play_duration,video_duration,time,date,watch_ratio\n"
-        "0,100,30.0,60.0,1609459200,2021-01-01,0.5\n"
+        "user_id,video_id,play_duration,video_duration,time,date,timestamp,watch_ratio\n"
+        "0,100,30.0,60.0,1609459200,2021-01-01,1609459200,0.5\n"
     )
     # no item_categories.csv — should not raise
     proc_dir = tmp_path / "proc"
