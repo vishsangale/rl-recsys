@@ -7,6 +7,7 @@ import pyarrow.parquet as pq
 REQUIRED_COLUMNS: dict[str, set[str]] = {
     "interactions": {"user_id", "item_id", "timestamp"},
     "sessions": {"session_id", "user_id", "item_id", "timestamp"},
+    "rl_sessions": {"session_id", "step", "user_state", "slate", "item_features", "clicks"},
     "slates": {"request_id", "user_id"},
     "social_edges": {"user_a", "user_b"},
     "items": {"item_id"},

@@ -10,6 +10,7 @@ import requests
 from tqdm import tqdm
 
 from rl_recsys.data.pipelines.base import BasePipeline
+from rl_recsys.data.schema import validate_parquet_schema
 
 
 class RL4RSPipeline(BasePipeline):
@@ -65,6 +66,7 @@ class RL4RSPipeline(BasePipeline):
         ].rename(columns={cols["session_id"]: "session_id"})
         out = self.processed_dir / "sessions.parquet"
         out_df.to_parquet(out, index=False)
+        validate_parquet_schema(out, "rl_sessions")
         print(f"Saved {len(out_df):,} rows ({out_df['session_id'].nunique():,} sessions) to {out}")
 
 
@@ -114,7 +116,7 @@ from rl_recsys.data.registry import register  # noqa: E402
 register(
     "rl4rs",
     RL4RSPipeline,
-    schema="slates",
+    schema="rl_sessions",
     tags=["RL/Slate"],
     raw_dir="data/raw/rl4rs",
     processed_dir="data/processed/rl4rs",

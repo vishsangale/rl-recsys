@@ -46,7 +46,7 @@ class KuaiRecPipeline(BasePipeline):
                 "time": "timestamp",
             }
         )
-        df["rating"] = pd.to_numeric(df["watch_ratio"], errors="coerce").clip(0.0, 1.0)
+        df["rating"] = pd.to_numeric(df["watch_ratio"], errors="coerce").clip(0.0, 1.0).fillna(0.0)
         df = df.drop(columns=["watch_ratio"])
 
         out = self.processed_dir / "interactions.parquet"

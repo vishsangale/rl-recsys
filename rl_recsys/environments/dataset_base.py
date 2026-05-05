@@ -155,6 +155,8 @@ class SessionDatasetEnv(RecEnv, ABC):
             raise ValueError(
                 f"feature_source must be 'native' or 'hashed', got {feature_source!r}"
             )
+        if slate_size > num_candidates:
+            raise ValueError("slate_size must be <= num_candidates")
 
         self._sessions = sessions
         self._session_ids = list(sessions.keys())
