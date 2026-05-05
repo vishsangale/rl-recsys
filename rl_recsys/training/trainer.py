@@ -41,14 +41,16 @@ def train(env: RecEnv, agent: Agent, cfg: ExperimentConfig) -> list[dict[str, fl
         episode_rewards: list[float] = []
         episode_clicks: list[np.ndarray] = []
 
-        # single-step episodes (re-rank a fresh candidate set each episode)
-        slate = agent.select_slate(obs)
-        step = env.step(slate)
-
-        agent_metrics = agent.update(obs, slate, step.reward, step.clicks, step.obs)
-
-        episode_rewards.append(step.reward)
-        episode_clicks.append(step.clicks)
+        agent_metrics: dict[str, float] = {}
+        done = False
+        while not done:
+            slate = agent.select_slate(obs)
+            step = env.step(slate)
+            agent_metrics = agent.update(obs, slate, step.reward, step.clicks, step.obs)
+            episode_rewards.append(step.reward)
+            episode_clicks.append(step.clicks)
+            obs = step.obs
+            done = step.done
 
         all_clicks = np.concatenate(episode_clicks)
         metrics = {
