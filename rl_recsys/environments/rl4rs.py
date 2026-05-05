@@ -36,11 +36,18 @@ class RL4RSEnv(SessionDatasetEnv):
                     "in sessions.parquet. Set feature_dim to match the data."
                 )
 
+        slate_lengths = df["slate"].apply(len)
+        if slate_lengths.nunique() != 1:
+            raise ValueError(
+                f"Inconsistent slate lengths in sessions.parquet: "
+                f"found {sorted(slate_lengths.unique().tolist())}."
+            )
+        num_candidates = int(slate_lengths.iloc[0])
+
         sessions: dict[int, pd.DataFrame] = {
             int(sid): grp.sort_values("step").reset_index(drop=True)
             for sid, grp in df.groupby("session_id")
         }
-        num_candidates = len(df.iloc[0]["slate"])
 
         super().__init__(
             sessions,

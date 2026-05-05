@@ -66,12 +66,33 @@ def test_hashed_mode_works(tmp_path):
     assert obs.candidate_features.shape == (3, 8)
 
 
-def test_reward_accumulates_across_steps(tmp_path):
-    _sessions_parquet(tmp_path, n_steps=3, slate_size=3, n_user_feats=4, n_item_feats=4)
+def test_reward_equals_click_sum(tmp_path):
+    rows = []
+    rng = np.random.default_rng(0)
+    for step in range(3):
+        rows.append({
+            "session_id": 0,
+            "step": step,
+            "user_state": [0.0, 0.0, 0.0, 0.0],
+            "slate": [10, 20, 30],
+            "item_features": rng.standard_normal((3, 4)).tolist(),
+            "clicks": [1, 0, 1],
+        })
+    pd.DataFrame(rows).to_parquet(tmp_path / "sessions.parquet", index=False)
+
     env = RL4RSEnv(tmp_path, slate_size=3, feature_dim=4, feature_source="native", seed=0)
     env.reset(seed=0)
-    total = 0.0
-    for _ in range(3):
-        step = env.step(np.array([0, 1, 2]))
-        total += step.reward
-    assert total >= 0.0
+    result = env.step(np.array([0, 1, 2]))
+    assert result.reward == pytest.approx(2.0)
+
+
+def test_inconsistent_slate_lengths_raises(tmp_path):
+    rows = [
+        {"session_id": 0, "step": 0, "user_state": [0.0] * 4,
+         "slate": [1, 2, 3], "item_features": [[0.0] * 4] * 3, "clicks": [0] * 3},
+        {"session_id": 0, "step": 1, "user_state": [0.0] * 4,
+         "slate": [1, 2], "item_features": [[0.0] * 4] * 2, "clicks": [0] * 2},
+    ]
+    pd.DataFrame(rows).to_parquet(tmp_path / "sessions.parquet", index=False)
+    with pytest.raises(ValueError, match="Inconsistent slate lengths"):
+        RL4RSEnv(tmp_path, slate_size=3, feature_dim=4, feature_source="native", seed=0)
