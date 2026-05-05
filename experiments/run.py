@@ -50,6 +50,8 @@ def main(cfg: DictConfig) -> None:
         num_candidates=env.num_candidates,
         user_dim=env.user_dim,
         item_dim=env.item_dim,
+        num_items=int(cfg.env.get("num_items", 1000)),
+        position_bias_decay=float(cfg.env.get("position_bias_decay", 0.5)),
     )
     cfg_for_exp = OmegaConf.merge(
         cfg,
@@ -58,7 +60,7 @@ def main(cfg: DictConfig) -> None:
     exp_cfg = to_experiment_config(cfg_for_exp)
     agent = build_agent(exp_cfg.agent, env_cfg)
 
-    env_type = str(cfg.env.get("type", "synthetic"))
+    env_type = str(cfg.env["type"])
     print(f"\nenv={env_type}  agent={exp_cfg.agent.name}  episodes={exp_cfg.train.num_episodes}")
 
     history = train(env, agent, exp_cfg)
