@@ -25,7 +25,7 @@ class TestSyntheticEnv:
         assert step.clicks.shape == (env_config.slate_size,)
         assert step.obs.user_features.shape == (env_config.user_dim,)
         assert isinstance(step.reward, float)
-        assert step.done is False
+        assert step.done is True  # bandit env: one step per episode
 
     def test_clicks_are_binary(
         self, env: SyntheticEnv, env_config: EnvConfig

@@ -1,3 +1,5 @@
+# DEPRECATED: Use experiments/run.py instead.
+# Equivalent: python experiments/run.py env=synthetic agent=<agent>
 """Run an agent baseline on the synthetic environment."""
 from __future__ import annotations
 

@@ -65,7 +65,8 @@ class SyntheticEnv(RecEnv):
 
         # new candidates for next step
         self._sample_candidates()
-        return RecStep(obs=self._obs(), reward=reward, clicks=clicks, done=False)
+        # SyntheticEnv is a bandit: one recommendation step per episode.
+        return RecStep(obs=self._obs(), reward=reward, clicks=clicks, done=True)
 
     # -- helpers --
 

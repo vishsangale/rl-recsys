@@ -1,3 +1,5 @@
+# DEPRECATED: Use experiments/run.py instead.
+# Equivalent: python experiments/run.py env=<env_type> agent=<agent>
 """Compare random and LinUCB agents on sampled logged-interaction datasets."""
 from __future__ import annotations
 
