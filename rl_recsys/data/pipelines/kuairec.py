@@ -10,7 +10,7 @@ from rl_recsys.data.download import download_file
 from rl_recsys.data.pipelines.base import BasePipeline
 from rl_recsys.data.schema import validate_parquet_schema
 
-_URL = "https://nas.chongminggao.top:4430/datasets/KuaiRec.zip"
+_URL = "https://zenodo.org/records/18164998/files/KuaiRec.zip"
 
 
 class KuaiRecPipeline(BasePipeline):
@@ -40,12 +40,7 @@ class KuaiRecPipeline(BasePipeline):
             raise FileNotFoundError(f"Not found: {matrix_file}. Run --download first.")
 
         df = pd.read_csv(matrix_file)
-        df = df.rename(
-            columns={
-                "video_id": "item_id",
-                "time": "timestamp",
-            }
-        )
+        df = df.rename(columns={"video_id": "item_id"})
         df["rating"] = pd.to_numeric(df["watch_ratio"], errors="coerce").clip(0.0, 1.0).fillna(0.0)
         df = df.drop(columns=["watch_ratio"])
 
