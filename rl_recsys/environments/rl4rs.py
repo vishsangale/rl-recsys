@@ -63,5 +63,6 @@ class RL4RSEnv(SessionDatasetEnv):
         self, row: pd.Series, candidate_ids: np.ndarray
     ) -> np.ndarray:
         if self._feature_source == "native":
+            # coerce to plain Python lists: pyarrow may return object arrays of arrays
             return np.array([list(r) for r in row["item_features"]], dtype=np.float32)
         return super()._get_item_features(row, candidate_ids)
