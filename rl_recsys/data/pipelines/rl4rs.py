@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import re
 import tarfile
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import requests
 from tqdm import tqdm
@@ -48,67 +46,24 @@ class RL4RSPipeline(BasePipeline):
             raise FileNotFoundError(
                 f"Not found: {rl_file}. Run --download first."
             )
-        df = pd.read_csv(rl_file)
-        cols = _detect_columns(df)
+        df = pd.read_csv(rl_file, sep="@")
 
-        df["step"] = df.groupby(cols["session_id"]).cumcount()
-        df["user_state"] = df[cols["user_feat"]].values.tolist()
-        df["slate"] = df[cols["item_id"]].values.tolist()
-        n_items = len(cols["item_id"])
-        arr = np.stack(
-            [df[cols["item_feat"][i]].to_numpy() for i in range(n_items)], axis=1
+        # Parse comma-separated columns into lists / arrays
+        df["slate"] = df["exposed_items"].apply(lambda s: [int(x) for x in str(s).split(",")])
+        df["clicks"] = df["user_feedback"].apply(lambda s: [int(x) for x in str(s).split(",")])
+        df["user_state"] = df["user_protrait"].apply(lambda s: [float(x) for x in str(s).split(",")])
+        # item_feature: rows are semicolon-separated per-item vectors (comma-separated floats)
+        df["item_features"] = df["item_feature"].apply(
+            lambda s: [[float(v) for v in vec.split(",")] for vec in str(s).split(";")]
         )
-        df["item_features"] = arr.tolist()
-        df["clicks"] = df[cols["click"]].values.tolist()
+        df["step"] = df.groupby("session_id").cumcount()
 
-        out_df = df[
-            [cols["session_id"], "step", "user_state", "slate", "item_features", "clicks"]
-        ].rename(columns={cols["session_id"]: "session_id"})
+        out_df = df[["session_id", "step", "user_state", "slate", "item_features", "clicks"]]
         out = self.processed_dir / "sessions.parquet"
         out_df.to_parquet(out, index=False)
         validate_parquet_schema(out, "rl_sessions")
         print(f"Saved {len(out_df):,} rows ({out_df['session_id'].nunique():,} sessions) to {out}")
 
-
-def _detect_columns(df: pd.DataFrame) -> dict:
-    user_feat = sorted(
-        [c for c in df.columns if re.match(r"^user_feat_\d+$", c)],
-        key=lambda x: int(x.split("_")[-1]),
-    )
-    item_id = sorted(
-        [c for c in df.columns if re.match(r"^item_id_\d+$", c)],
-        key=lambda x: int(x.split("_")[-1]),
-    )
-    n_items = len(item_id)
-    item_feat = [
-        sorted(
-            [c for c in df.columns if re.match(rf"^item_{i}_feat_\d+$", c)],
-            key=lambda x: int(x.split("_")[-1]),
-        )
-        for i in range(n_items)
-    ]
-    click = sorted(
-        [c for c in df.columns if re.match(r"^click_\d+$", c)],
-        key=lambda x: int(x.split("_")[-1]),
-    )
-    session_id = "session_id"
-    if session_id not in df.columns:
-        raise ValueError(
-            f"'session_id' column not found in CSV. Available columns: {list(df.columns)}"
-        )
-    if not user_feat:
-        raise ValueError("No user_feat_N columns found in CSV.")
-    if not item_id:
-        raise ValueError("No item_id_N columns found in CSV.")
-    if not click:
-        raise ValueError("No click_N columns found in CSV.")
-    return {
-        "session_id": session_id,
-        "user_feat": user_feat,
-        "item_id": item_id,
-        "item_feat": item_feat,
-        "click": click,
-    }
 
 
 from rl_recsys.data.registry import register  # noqa: E402

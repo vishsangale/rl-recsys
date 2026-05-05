@@ -81,9 +81,17 @@ def test_linucb_positive_feedback_improves_clicked_candidate_score() -> None:
     assert agent.select_slate(obs).tolist() == [0]
 
 
-def test_linucb_requires_matching_user_and_item_dims() -> None:
-    with pytest.raises(ValueError, match="user_dim == item_dim"):
-        LinUCBAgent(slate_size=1, user_dim=2, item_dim=3)
+def test_linucb_works_with_mismatched_user_and_item_dims() -> None:
+    # Interaction term uses min(user_dim, item_dim) dims, so unequal dims are fine.
+    agent = LinUCBAgent(slate_size=1, user_dim=4, item_dim=3)
+    rng = np.random.default_rng(0)
+    obs = RecObs(
+        user_features=rng.standard_normal(4).astype(np.float32),
+        candidate_features=rng.standard_normal((3, 3)).astype(np.float32),
+        candidate_ids=np.array([0, 1, 2]),
+    )
+    slate = agent.select_slate(obs)
+    assert slate.shape == (1,)
 
 
 def test_build_agent_supports_random_and_linucb() -> None:

@@ -21,20 +21,15 @@ class RL4RSEnv(SessionDatasetEnv):
         processed_dir = Path(processed_dir)
         df = pd.read_parquet(processed_dir / "sessions.parquet")
 
+        sample_row = df.iloc[0]
         if feature_source == "native":
-            sample_row = df.iloc[0]
-            actual_user_dim = len(sample_row["user_state"])
-            actual_item_dim = len(sample_row["item_features"][0])
-            if feature_dim != actual_user_dim:
-                raise ValueError(
-                    f"feature_dim={feature_dim} does not match user_state length={actual_user_dim} "
-                    "in sessions.parquet. Set feature_dim to match the data."
-                )
-            if feature_dim != actual_item_dim:
-                raise ValueError(
-                    f"feature_dim={feature_dim} does not match item_features width={actual_item_dim} "
-                    "in sessions.parquet. Set feature_dim to match the data."
-                )
+            # Derive dims from data; user and item dims may differ.
+            self._user_dim = len(sample_row["user_state"])
+            self._item_dim = len(sample_row["item_features"][0])
+            feature_dim = self._user_dim  # parent uses this for hashing fallback only
+        else:
+            self._user_dim = feature_dim
+            self._item_dim = feature_dim
 
         slate_lengths = df["slate"].apply(len)
         if slate_lengths.nunique() != 1:
@@ -57,6 +52,14 @@ class RL4RSEnv(SessionDatasetEnv):
             feature_source=feature_source,
             seed=seed,
         )
+
+    @property
+    def user_dim(self) -> int:
+        return self._user_dim
+
+    @property
+    def item_dim(self) -> int:
+        return self._item_dim
 
     def _compute_reward(self, row: pd.Series, clicks: np.ndarray) -> float:
         return float(clicks.sum())

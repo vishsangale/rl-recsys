@@ -52,10 +52,13 @@ def test_done_true_at_session_end(tmp_path):
     assert step.done is True
 
 
-def test_native_feature_dim_mismatch_raises(tmp_path):
-    _sessions_parquet(tmp_path, n_user_feats=4, n_item_feats=4, slate_size=3)
-    with pytest.raises(ValueError, match="feature_dim"):
-        RL4RSEnv(tmp_path, slate_size=3, feature_dim=8, feature_source="native", seed=0)
+def test_native_feature_dim_autodetect(tmp_path):
+    # When feature_source="native", RL4RSEnv ignores feature_dim and reads
+    # actual dims from the parquet data.
+    _sessions_parquet(tmp_path, n_user_feats=4, n_item_feats=6, slate_size=3)
+    env = RL4RSEnv(tmp_path, slate_size=3, feature_dim=999, feature_source="native", seed=0)
+    assert env.user_dim == 4
+    assert env.item_dim == 6
 
 
 def test_hashed_mode_works(tmp_path):

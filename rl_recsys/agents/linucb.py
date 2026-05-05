@@ -16,16 +16,12 @@ class LinUCBAgent(Agent):
         item_dim: int,
         alpha: float = 1.0,
     ) -> None:
-        if user_dim != item_dim:
-            raise ValueError(
-                "LinUCBAgent requires user_dim == item_dim for the "
-                "user * item interaction feature"
-            )
         self._slate_size = slate_size
         self._user_dim = user_dim
         self._item_dim = item_dim
+        self._interaction_dim = min(user_dim, item_dim)
         self._alpha = alpha
-        self._feature_dim = user_dim + item_dim + user_dim
+        self._feature_dim = user_dim + item_dim + self._interaction_dim
         self._a_matrix = np.eye(self._feature_dim, dtype=np.float64)
         self._b_vector = np.zeros(self._feature_dim, dtype=np.float64)
 
@@ -85,5 +81,6 @@ class LinUCBAgent(Agent):
                 f"{items.shape} does not match (*, {self._item_dim})"
             )
         user_block = np.broadcast_to(user, (items.shape[0], self._user_dim))
-        interaction = user_block * items
+        d = self._interaction_dim
+        interaction = user_block[:, :d] * items[:, :d]
         return np.concatenate([user_block, items, interaction], axis=1)
