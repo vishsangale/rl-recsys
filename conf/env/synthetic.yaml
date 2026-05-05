@@ -1,3 +1,4 @@
+type: synthetic
 num_items: 1000
 num_candidates: 50
 slate_size: 10

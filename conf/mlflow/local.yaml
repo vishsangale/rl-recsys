@@ -1,0 +1,6 @@
+enabled: true
+tracking_uri: sqlite:///${runtime.project_results_dir}/mlflow/mlflow.db
+experiment_name: rl-recsys-benchmark
+run_name: ${runtime.workspace_run_id}
+artifact_path: ${runtime.workspace_run_id}
+tags: {}

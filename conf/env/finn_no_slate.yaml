@@ -1,0 +1,6 @@
+type: finn_no_slate
+processed_dir: data/processed/finn-no-slate
+slate_size: 5
+feature_dim: 16
+feature_source: hashed
+seed: 42

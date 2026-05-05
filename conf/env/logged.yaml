@@ -1,0 +1,8 @@
+type: logged
+processed_dir: data/processed/movielens
+filename: ratings_100k.parquet
+slate_size: 10
+num_candidates: 50
+feature_dim: 16
+rating_threshold: 4.0
+seed: 42

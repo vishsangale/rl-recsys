@@ -1,0 +1,6 @@
+type: rl4rs
+processed_dir: data/processed/rl4rs
+slate_size: 6
+feature_dim: 32
+feature_source: native
+seed: 42

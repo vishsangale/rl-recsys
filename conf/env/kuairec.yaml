@@ -1,0 +1,7 @@
+type: kuairec
+processed_dir: data/processed/kuairec
+slate_size: 6
+num_candidates: 50
+feature_dim: 32
+feature_source: native
+seed: 42
