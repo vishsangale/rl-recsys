@@ -36,3 +36,17 @@ def ctr(clicks: np.ndarray) -> float:
     if len(clicks) == 0:
         return 0.0
     return float(clicks.mean())
+
+
+def discounted_return(rewards: np.ndarray, gamma: float = 0.95) -> float:
+    rewards = np.asarray(rewards, dtype=np.float64)
+    if len(rewards) == 0:
+        return 0.0
+    powers = np.arange(len(rewards), dtype=np.float64)
+    return float(np.sum(rewards * gamma ** powers))
+
+
+def per_session_reward(session_rewards: list[np.ndarray]) -> float:
+    if not session_rewards:
+        return 0.0
+    return float(np.mean([np.sum(r) for r in session_rewards]))
