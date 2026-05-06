@@ -7,7 +7,7 @@ import numpy as np
 
 from rl_recsys.agents.base import Agent
 from rl_recsys.environments.base import RecEnv
-from rl_recsys.training.metrics import ctr, mrr, ndcg_at_k
+from rl_recsys.training.metrics import ctr, discounted_return, mrr, ndcg_at_k
 
 
 @dataclass
@@ -19,6 +19,7 @@ class BanditEvaluation:
     ctr: float
     ndcg: float
     mrr: float
+    discounted_return: float
     seconds: float
 
     def as_dict(self) -> dict[str, float | int | str]:
@@ -30,6 +31,7 @@ class BanditEvaluation:
             "ctr": self.ctr,
             "ndcg": self.ndcg,
             "mrr": self.mrr,
+            "discounted_return": self.discounted_return,
             "seconds": self.seconds,
         }
 
@@ -41,6 +43,7 @@ def evaluate_bandit_agent(
     agent_name: str,
     episodes: int,
     seed: int,
+    gamma: float = 0.95,
 ) -> BanditEvaluation:
     rng = np.random.default_rng(seed)
     rewards: list[float] = []
@@ -48,6 +51,7 @@ def evaluate_bandit_agent(
     ctrs: list[float] = []
     ndcgs: list[float] = []
     mrrs: list[float] = []
+    disc_returns: list[float] = []
     started = perf_counter()
 
     for _ in range(episodes):
@@ -60,6 +64,7 @@ def evaluate_bandit_agent(
         ctrs.append(ctr(step.clicks))
         ndcgs.append(ndcg_at_k(step.clicks))
         mrrs.append(mrr(step.clicks))
+        disc_returns.append(discounted_return(np.array([step.reward]), gamma=gamma))
 
     seconds = perf_counter() - started
     return BanditEvaluation(
@@ -70,5 +75,6 @@ def evaluate_bandit_agent(
         ctr=float(np.mean(ctrs)),
         ndcg=float(np.mean(ndcgs)),
         mrr=float(np.mean(mrrs)),
+        discounted_return=float(np.mean(disc_returns)),
         seconds=float(seconds),
     )
