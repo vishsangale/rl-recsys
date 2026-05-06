@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Protocol
+from typing import Callable, Protocol
 
 import numpy as np
 
@@ -84,6 +84,41 @@ def snips_value(
     if denominator <= 0.0:
         return 0.0
     return float(np.sum(weights * rewards) / denominator)
+
+
+def swis_value(
+    rewards: np.ndarray,
+    target_probabilities: np.ndarray,
+    propensities: np.ndarray,
+    clip: tuple[float, float] = (0.1, 10.0),
+) -> float:
+    """Step-Wise Importance Sampling with propensity ratio clipping."""
+    rewards, target_probabilities, propensities = _validate_ope_arrays(
+        rewards, target_probabilities, propensities
+    )
+    weights = np.clip(target_probabilities / propensities, clip[0], clip[1])
+    return float(np.mean(weights * rewards))
+
+
+def dr_value(
+    rewards: np.ndarray,
+    target_probabilities: np.ndarray,
+    propensities: np.ndarray,
+    reward_model: Callable[[int], float] | None = None,
+    clip: tuple[float, float] = (0.1, 10.0),
+) -> float:
+    """Doubly Robust OPE estimator."""
+    rewards, target_probabilities, propensities = _validate_ope_arrays(
+        rewards, target_probabilities, propensities
+    )
+    weights = np.clip(target_probabilities / propensities, clip[0], clip[1])
+    if reward_model is None:
+        reward_hat = np.full(len(rewards), float(np.mean(rewards)))
+    else:
+        reward_hat = np.array(
+            [reward_model(i) for i in range(len(rewards))], dtype=np.float64
+        )
+    return float(np.mean(weights * (rewards - reward_hat) + reward_hat))
 
 
 def evaluate_ope_agent(

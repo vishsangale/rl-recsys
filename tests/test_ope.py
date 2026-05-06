@@ -1,13 +1,16 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from rl_recsys.agents import LinUCBAgent, RandomAgent
 from rl_recsys.environments.open_bandit import OpenBanditEventSampler
 from rl_recsys.evaluation.ope import (
+    dr_value,
     evaluate_ope_agent,
     ips_value,
     replay_value,
     snips_value,
+    swis_value,
 )
 
 
@@ -193,3 +196,52 @@ def test_ope_summary_serializes_to_csv(tmp_path) -> None:
     pd.DataFrame([result.as_dict()]).to_csv(path, index=False)
 
     assert path.read_text().startswith("agent,episodes,matches")
+
+
+def test_swis_clips_extreme_ratios() -> None:
+    # ratio for episode 0: 0.5/0.01 = 50 → clipped to 10
+    rewards = np.array([1.0, 0.0, 1.0])
+    target_probabilities = np.array([0.5, 0.5, 0.5])
+    propensities = np.array([0.01, 0.5, 0.25])
+
+    result = swis_value(rewards, target_probabilities, propensities)
+
+    # clipped weights: [10.0, 1.0, 2.0]; weighted rewards: [10.0, 0.0, 2.0]; mean=4.0
+    assert result == pytest.approx(4.0)
+    # unclipped IPS would give mean([50.0, 0.0, 2.0]) ≠ 4.0
+    assert result != pytest.approx(ips_value(rewards, target_probabilities, propensities))
+
+
+def test_dr_uses_mean_reward_when_no_model() -> None:
+    # equal weights → DR collapses to mean(rewards)
+    rewards = np.array([2.0, 4.0])
+    target_probabilities = np.array([0.5, 0.5])
+    propensities = np.array([0.5, 0.5])  # ratio=1.0, no clipping
+
+    result = dr_value(rewards, target_probabilities, propensities, reward_model=None)
+
+    assert result == pytest.approx(float(np.mean(rewards)))
+
+
+def test_dr_uses_provided_reward_model() -> None:
+    rewards = np.array([1.0, 0.0])
+    target_probabilities = np.array([0.5, 0.5])
+    propensities = np.array([1.0, 0.5])  # weights: [0.5, 1.0]
+    # r_hat = 0.0 for all; dr = mean([0.5*(1-0)+0, 1.0*(0-0)+0]) = mean([0.5, 0]) = 0.25
+    result = dr_value(
+        rewards, target_probabilities, propensities, reward_model=lambda i: 0.0
+    )
+    assert result == pytest.approx(0.25)
+
+
+def test_evaluate_ope_agent_populates_swis_and_dr() -> None:
+    rows = _open_bandit_rows()
+    result = evaluate_ope_agent(
+        OpenBanditEventSampler(rows, num_candidates=4, feature_dim=8, seed=0),
+        RandomAgent(slate_size=1, seed=0),
+        agent_name="random",
+        episodes=8,
+        seed=0,
+    )
+    assert np.isfinite(result.swis_value)
+    assert np.isfinite(result.dr_value)
