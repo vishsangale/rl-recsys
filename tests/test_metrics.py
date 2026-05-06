@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -13,7 +15,8 @@ def test_discounted_return_geometric_decay() -> None:
 def test_discounted_return_single_step() -> None:
     rewards = np.array([3.7])
     assert discounted_return(rewards, gamma=0.95) == pytest.approx(3.7)
-    assert discounted_return(rewards, gamma=0.0) == pytest.approx(3.7)
+    # gamma=0.0: only first step counts, all subsequent are zeroed
+    assert discounted_return(np.array([1.0, 2.0, 3.0]), gamma=0.0) == pytest.approx(1.0)
 
 
 def test_per_session_reward_averages_sessions() -> None:
