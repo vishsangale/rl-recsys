@@ -92,3 +92,32 @@ def test_variance_std_is_zero_for_deterministic_env() -> None:
 
     assert result.std["avg_reward"] == pytest.approx(0.0, abs=1e-10)
     assert result.mean["avg_reward"] == pytest.approx(1.0)
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class _FakeResult:
+    agent: str
+    score: float
+    count: int
+    seconds: float
+
+
+def test_evaluate_with_variance_introspects_dataclass_fields() -> None:
+    from rl_recsys.evaluation.variance import _aggregate_runs
+
+    runs = [
+        _FakeResult(agent="x", score=1.0, count=10, seconds=0.5),
+        _FakeResult(agent="x", score=3.0, count=12, seconds=0.6),
+        _FakeResult(agent="x", score=5.0, count=14, seconds=0.7),
+    ]
+    mean, std = _aggregate_runs(runs)
+
+    assert "agent" not in mean
+    assert "agent" not in std
+    assert set(mean.keys()) == {"score", "count", "seconds"}
+    assert mean["score"] == pytest.approx(3.0)
+    assert mean["count"] == pytest.approx(12.0)
+    assert std["score"] == pytest.approx(np.std([1.0, 3.0, 5.0]))
