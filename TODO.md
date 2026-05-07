@@ -12,7 +12,7 @@ Needs per-step propensity in trajectory data. The flagship CPE estimator from th
 ## Loader / data
 
 ### Loader init perf at scale
-60s init on the 28M-row finn-no-slate parquet (set-based item universe build). Acceptable for offline batch use; not great for iterative experimentation. Options: (a) stream the `slate` column via pyarrow row-groups instead of materializing the full DataFrame, (b) cache `_item_universe` to disk keyed by `(path, mtime)`, (c) accept a pre-built universe in the constructor for power users.
+Reduced from 60s → 16s on the 28M-row finn-no-slate parquet by switching the universe build to `pyarrow.compute.unique`. The remaining 16s is dominated by `pd.read_parquet` of the full DataFrame. Further wins available: (a) cache the loaded DataFrame across loader instances keyed by `(path, mtime)`, (b) accept a pre-loaded DataFrame in the constructor for power users, (c) only read non-slate columns lazily via pyarrow filtering at `iter_sessions` time.
 
 ### KuaiRec trajectory loader
 KuaiRec has timestamped per-user interactions. A `KuaiRecTrajectoryLoader` would group by `user_id` ordered by `timestamp`, mirroring the finn-no-slate loader's interface. Slate semantics differ — KuaiRec is single-item per impression — so the replay rule needs adapting (logged_clicked_id = item_id when watch_ratio > threshold).
@@ -36,11 +36,8 @@ Schema/range/distribution sanity checks for processed parquets. Catches pipeline
 
 ## Hygiene / polish
 
-### Aggregate-skip metadata for `_aggregate_runs`
-`sessions`, `total_steps`, `episodes`, `seconds` show up in `VarianceEvaluation.mean`/`std` despite not being metrics. Tag those fields with `metadata={"aggregate": False}` on the source dataclass and have `_aggregate_runs` honor it.
-
 ### `_aggregate_runs` doc + tests
-Docstring should note `np.std` uses ddof=0 (population std). Add a test for the empty-input path (`_aggregate_runs([])`).
+Add a test for the empty-input path (`_aggregate_runs([])`) and for the metadata-skip behavior directly (rather than indirectly via `VarianceEvaluation` keys).
 
 ### Loader error-path tests
 Add tests for `FinnNoSlateTrajectoryLoader`'s missing-columns error and the synthetic-padding fallback (item universe smaller than `n_pad`).
