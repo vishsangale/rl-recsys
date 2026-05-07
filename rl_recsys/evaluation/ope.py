@@ -33,6 +33,8 @@ class OPEEvaluation:
     replay_value: float
     ips_value: float
     snips_value: float
+    swis_value: float
+    dr_value: float
     avg_logged_reward: float
     seconds: float
 
@@ -45,6 +47,8 @@ class OPEEvaluation:
             "replay_value": self.replay_value,
             "ips_value": self.ips_value,
             "snips_value": self.snips_value,
+            "swis_value": self.swis_value,
+            "dr_value": self.dr_value,
             "avg_logged_reward": self.avg_logged_reward,
             "seconds": self.seconds,
         }
@@ -171,6 +175,8 @@ def evaluate_ope_agent(
         replay_value=replay_value(rewards, target_matches),
         ips_value=ips_value(rewards, target_probabilities, propensities),
         snips_value=snips_value(rewards, target_probabilities, propensities),
+        swis_value=swis_value(rewards, target_probabilities, propensities),
+        dr_value=dr_value(rewards, target_probabilities, propensities),
         avg_logged_reward=float(np.mean(rewards)),
         seconds=float(seconds),
     )
