@@ -4,10 +4,17 @@ Items deferred from prior batches and observations that surfaced during runs. Or
 
 ## Next up
 
-### Sequential DR estimator
-Needs per-step propensity in trajectory data. The flagship CPE estimator from the RL4RS paper. Two sub-tasks:
-- **Extend RL4RS pipeline** to extract behavior-policy propensities from raw CSVs and write multi-step `sessions.parquet` (currently collapsed to single-step). Required before we can implement true sequential DR on the paper's reference dataset.
-- **Implement `seq_dr_value`** that walks per-step IS along a trajectory: `sum_t (prod_{u≤t} w_u) * (r_t − r̂_t) + V̂_t` with appropriate clipping. Lives in `rl_recsys/evaluation/ope.py` next to `dr_value`.
+### Real-data Sequential DR
+The pure `seq_dr_value` estimator and `evaluate_trajectory_ope_agent` orchestrator are shipped (verified end-to-end on a synthetic source). What's left for real-dataset use:
+- **Extend RL4RS pipeline** to extract behavior-policy propensities from raw CSVs and write multi-step `sessions.parquet` (currently collapsed to single-step).
+- **Build a `LoggedTrajectorySource` impl** for the fixed RL4RS data — yields `LoggedTrajectoryStep`s with per-step propensity.
+- **Add `evaluate_trajectory_ope_with_variance`** sibling once a real source exists to drive it.
+
+### Sequential DR API polish
+Non-blocking items the final review flagged:
+- Document the empty-trajectory skip policy in `evaluate_trajectory_ope_agent` (currently silently skips empty trajectories — pick raise-vs-skip and document).
+- Add raise-path tests: `max_trajectories <= 0`, all-empty source, RandomAgent branch of `_target_probability`.
+- Add a standalone T=1 `seq_dr_value` test confirming the bandit-collapse case explicitly.
 
 ## Loader / data
 
