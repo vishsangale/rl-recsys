@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from rl_recsys.agents import LinUCBAgent, RandomAgent
+from rl_recsys.data.loaders.finn_no_slate_trajectory import FinnNoSlateTrajectoryLoader
 from rl_recsys.environments.base import RecObs
 from rl_recsys.evaluation.trajectory import (
     Session,
@@ -194,9 +195,6 @@ def test_replay_reward_zero_when_no_logged_click() -> None:
     assert result.avg_session_hit_rate == pytest.approx(0.0)
 
 
-from rl_recsys.data.loaders.finn_no_slate_trajectory import FinnNoSlateTrajectoryLoader
-
-
 def test_finn_no_slate_loader_emits_sessions(tmp_path) -> None:
     df = pd.DataFrame(
         {
@@ -268,3 +266,42 @@ def test_finn_no_slate_loader_rejects_small_num_candidates(tmp_path) -> None:
             slate_size=3,
             seed=0,
         )
+
+
+def test_finn_no_slate_loader_shuffles_sessions_with_seed(tmp_path) -> None:
+    # 4 users, single step each; seeded shuffles should produce different orders,
+    # while seed=None should preserve ascending user_id order.
+    df = pd.DataFrame(
+        {
+            "request_id": [0, 1, 2, 3],
+            "user_id": [10, 11, 12, 13],
+            "clicks": [0, 0, 0, 0],
+            "slate": [
+                [100, 101, 102, 103, 104],
+                [200, 201, 202, 203, 204],
+                [300, 301, 302, 303, 304],
+                [400, 401, 402, 403, 404],
+            ],
+        }
+    )
+    parquet_path = tmp_path / "slates.parquet"
+    df.to_parquet(parquet_path, index=False)
+
+    loader = FinnNoSlateTrajectoryLoader(
+        parquet_path, num_candidates=8, feature_dim=4, slate_size=3, seed=0
+    )
+
+    # seed=None preserves file (sorted) order
+    file_order = [s.session_id for s in loader.iter_sessions()]
+    assert file_order == [10, 11, 12, 13]
+
+    # seeds produce deterministic permutations
+    order_a = [s.session_id for s in loader.iter_sessions(seed=42)]
+    order_a_again = [s.session_id for s in loader.iter_sessions(seed=42)]
+    assert order_a == order_a_again
+    assert sorted(order_a) == [10, 11, 12, 13]  # all 4 still present
+
+    # different seeds usually produce different orders (4! = 24 permutations,
+    # collision unlikely between two specific seeds for this small example)
+    order_b = [s.session_id for s in loader.iter_sessions(seed=99)]
+    assert order_b != file_order or order_a != file_order  # at least one shuffles

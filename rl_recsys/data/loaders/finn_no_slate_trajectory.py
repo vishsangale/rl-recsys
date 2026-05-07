@@ -66,10 +66,15 @@ class FinnNoSlateTrajectoryLoader:
         groups = ordered.groupby("user_id", sort=False)
         rng = np.random.default_rng(self._seed if seed is None else seed)
 
+        user_ids = list(groups.groups.keys())
+        if seed is not None:
+            rng.shuffle(user_ids)
+
         emitted = 0
-        for user_id, group in groups:
+        for user_id in user_ids:
             if max_sessions is not None and emitted >= max_sessions:
                 break
+            group = groups.get_group(user_id)
             steps: list[TrajectoryStep] = []
             for _, row in group.iterrows():
                 logged_slate = np.asarray(row["slate"], dtype=np.int64)
