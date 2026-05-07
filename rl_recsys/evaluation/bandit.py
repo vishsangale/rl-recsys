@@ -45,6 +45,8 @@ def evaluate_bandit_agent(
     seed: int,
     gamma: float = 0.95,
 ) -> BanditEvaluation:
+    # gamma has no effect in bandit mode: single-step episodes mean gamma^0=1 always.
+    # Accepted for API parity with multi-step evaluate_* functions.
     rng = np.random.default_rng(seed)
     rewards: list[float] = []
     hits: list[float] = []
