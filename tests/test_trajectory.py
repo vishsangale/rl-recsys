@@ -53,7 +53,14 @@ class _DeterministicSlateAgent:
     def select_slate(self, obs: RecObs) -> np.ndarray:
         return np.arange(self._slate_size, dtype=np.int64)
 
-    def update(self, obs, slate, reward, clicks, next_obs):
+    def update(
+        self,
+        obs: RecObs,
+        slate: np.ndarray,
+        reward: float,
+        clicks: np.ndarray,
+        next_obs: RecObs,
+    ) -> dict[str, float]:
         return {}
 
 
@@ -156,3 +163,31 @@ def test_evaluate_trajectory_agent_does_not_mutate_agent_state() -> None:
 
     assert np.array_equal(agent._a_matrix, a_before)
     assert np.array_equal(agent._b_vector, b_before)
+
+
+def test_replay_reward_zero_when_no_logged_click() -> None:
+    # logged_clicked_id == -1 sentinel: no click was logged, reward must be 0
+    # regardless of what the agent picks.
+    cand = np.array([10, 11, 12, 13])
+    feature_dim = 4
+    obs = RecObs(
+        user_features=np.zeros(feature_dim, dtype=np.float64),
+        candidate_features=np.zeros((len(cand), feature_dim), dtype=np.float64),
+        candidate_ids=cand,
+    )
+    step = TrajectoryStep(
+        obs=obs,
+        logged_slate=cand[:3].copy(),
+        logged_clicked_id=-1,
+        logged_reward=0.0,
+    )
+    session = Session(session_id=1, steps=[step])
+    dataset = _StaticDataset(sessions=[session])
+    agent = _DeterministicSlateAgent(slate_size=3)
+
+    result = evaluate_trajectory_agent(
+        dataset, agent, agent_name="det", max_sessions=1, seed=0
+    )
+
+    assert result.avg_session_reward == pytest.approx(0.0)
+    assert result.avg_session_hit_rate == pytest.approx(0.0)

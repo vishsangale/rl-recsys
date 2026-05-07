@@ -14,7 +14,7 @@ from rl_recsys.training.metrics import ctr, discounted_return, mrr, ndcg_at_k
 @dataclass(frozen=True)
 class TrajectoryStep:
     obs: RecObs
-    logged_slate: np.ndarray
+    logged_slate: np.ndarray  # (slate_size,) item IDs the user actually saw — provenance only, not used by the replay reward rule
     logged_clicked_id: int
     logged_reward: float
 
