@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from rl_recsys.agents import LinUCBAgent, RandomAgent
@@ -191,3 +192,79 @@ def test_replay_reward_zero_when_no_logged_click() -> None:
 
     assert result.avg_session_reward == pytest.approx(0.0)
     assert result.avg_session_hit_rate == pytest.approx(0.0)
+
+
+from rl_recsys.data.loaders.finn_no_slate_trajectory import FinnNoSlateTrajectoryLoader
+
+
+def test_finn_no_slate_loader_emits_sessions(tmp_path) -> None:
+    df = pd.DataFrame(
+        {
+            "request_id": [0, 1, 2, 3, 4, 5, 6],
+            "user_id": [10, 10, 10, 11, 11, 12, 12],
+            "clicks": [0, 2, 1, 3, 0, 4, 2],
+            "slate": [
+                [100, 101, 102, 103, 104],
+                [200, 201, 202, 203, 204],
+                [300, 301, 302, 303, 304],
+                [400, 401, 402, 403, 404],
+                [500, 501, 502, 503, 504],
+                [600, 601, 602, 603, 604],
+                [700, 701, 702, 703, 704],
+            ],
+        }
+    )
+    parquet_path = tmp_path / "slates.parquet"
+    df.to_parquet(parquet_path, index=False)
+
+    loader = FinnNoSlateTrajectoryLoader(
+        parquet_path,
+        num_candidates=8,
+        feature_dim=4,
+        slate_size=3,
+        seed=0,
+    )
+    sessions = list(loader.iter_sessions())
+
+    assert len(sessions) == 3
+    sessions_by_id = {s.session_id: s for s in sessions}
+    assert sessions_by_id[10].steps[0].logged_clicked_id == 100
+    assert sessions_by_id[10].steps[1].logged_clicked_id == 202
+    assert sessions_by_id[10].steps[2].logged_clicked_id == 301
+    assert len(sessions_by_id[11].steps) == 2
+    assert sessions_by_id[11].steps[0].logged_clicked_id == 403
+    assert len(sessions_by_id[12].steps) == 2
+
+    for session in sessions:
+        for step in session.steps:
+            assert step.obs.candidate_ids.shape == (8,)
+            assert step.obs.candidate_features.shape == (8, 4)
+            assert step.obs.user_features.shape == (4,)
+            assert set(step.logged_slate.tolist()).issubset(
+                step.obs.candidate_ids.tolist()
+            )
+
+    capped = list(loader.iter_sessions(max_sessions=2))
+    assert len(capped) == 2
+
+
+def test_finn_no_slate_loader_rejects_small_num_candidates(tmp_path) -> None:
+    df = pd.DataFrame(
+        {
+            "request_id": [0],
+            "user_id": [10],
+            "clicks": [0],
+            "slate": [[100, 101, 102, 103, 104]],
+        }
+    )
+    parquet_path = tmp_path / "slates.parquet"
+    df.to_parquet(parquet_path, index=False)
+
+    with pytest.raises(ValueError, match="num_candidates"):
+        FinnNoSlateTrajectoryLoader(
+            parquet_path,
+            num_candidates=3,
+            feature_dim=4,
+            slate_size=3,
+            seed=0,
+        )
