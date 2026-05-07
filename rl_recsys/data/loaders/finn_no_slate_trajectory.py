@@ -51,10 +51,13 @@ class FinnNoSlateTrajectoryLoader:
         self._slate_size = int(slate_size)
         self._seed = int(seed)
 
-        all_items = np.concatenate(
-            [np.asarray(row, dtype=np.int64) for row in self._df["slate"].to_numpy()]
-        )
-        self._item_universe = np.unique(all_items)
+        # Build universe via a Python set to avoid a multi-GB intermediate on
+        # large parquets — finn-no-slate's full 28M rows × 25-item slates would
+        # otherwise allocate ~5.6 GB just to compute unique items.
+        universe: set[int] = set()
+        for row in self._df["slate"]:
+            universe.update(int(i) for i in row)
+        self._item_universe = np.array(sorted(universe), dtype=np.int64)
 
     def iter_sessions(
         self, *, max_sessions: int | None = None, seed: int | None = None
@@ -97,16 +100,21 @@ class FinnNoSlateTrajectoryLoader:
     ) -> np.ndarray:
         n_pad = self._num_candidates - len(logged_slate)
         if n_pad == 0:
-            return logged_slate.copy()
-        pool = self._item_universe[~np.isin(self._item_universe, logged_slate)]
-        if len(pool) < n_pad:
-            extra = np.arange(
-                self._item_universe.max() + 1,
-                self._item_universe.max() + 1 + (n_pad - len(pool)),
-                dtype=np.int64,
-            )
-            pad_pool = np.concatenate([pool, extra])
-            pad = pad_pool[:n_pad]
+            ids = logged_slate.copy()
         else:
-            pad = rng.choice(pool, size=n_pad, replace=False)
-        return np.concatenate([logged_slate, pad.astype(np.int64)])
+            pool = self._item_universe[~np.isin(self._item_universe, logged_slate)]
+            if len(pool) < n_pad:
+                extra = np.arange(
+                    self._item_universe.max() + 1,
+                    self._item_universe.max() + 1 + (n_pad - len(pool)),
+                    dtype=np.int64,
+                )
+                pad_pool = np.concatenate([pool, extra])
+                pad = pad_pool[:n_pad]
+            else:
+                pad = rng.choice(pool, size=n_pad, replace=False)
+            ids = np.concatenate([logged_slate, pad.astype(np.int64)])
+        # Shuffle so logged-slate items don't always occupy positions 0..slate_size-1
+        # — that would let a positional-prior agent trivially achieve coverage.
+        rng.shuffle(ids)
+        return ids
