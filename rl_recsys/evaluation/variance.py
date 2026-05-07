@@ -24,11 +24,18 @@ class VarianceEvaluation:
 def _aggregate_runs(
     results: list[Any],
 ) -> tuple[dict[str, float], dict[str, float]]:
-    """Mean and std over scalar (int/float) fields shared by all dataclass results."""
+    """Mean and std over scalar (int/float) fields shared by all dataclass results.
+
+    Skips fields tagged with `metadata={"aggregate": False}` — used to exclude
+    run-config (episodes, sessions) and runtime (seconds) from metric output.
+    np.std uses ddof=0 (population std).
+    """
     if not results:
         return {}, {}
     numeric_keys: list[str] = []
     for f in fields(results[0]):
+        if f.metadata.get("aggregate") is False:
+            continue
         ftype = f.type
         if ftype in (float, int) or ftype in ("float", "int"):
             numeric_keys.append(f.name)

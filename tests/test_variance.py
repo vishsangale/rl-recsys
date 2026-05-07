@@ -162,9 +162,7 @@ def test_evaluate_trajectory_with_variance_returns_finite_mean_and_std(tmp_path)
     )
 
     assert result.n_seeds == 3
-    for key in (
-        "sessions",
-        "total_steps",
+    metric_keys = (
         "avg_session_reward",
         "avg_discounted_return",
         "avg_session_length",
@@ -172,9 +170,13 @@ def test_evaluate_trajectory_with_variance_returns_finite_mean_and_std(tmp_path)
         "avg_per_step_ctr",
         "avg_per_step_ndcg",
         "avg_per_step_mrr",
-        "seconds",
-    ):
+    )
+    for key in metric_keys:
         assert key in result.mean
         assert key in result.std
         assert np.isfinite(result.mean[key])
         assert np.isfinite(result.std[key])
+    # Run-config and runtime fields are excluded via aggregate-skip metadata
+    for skipped in ("sessions", "total_steps", "seconds"):
+        assert skipped not in result.mean
+        assert skipped not in result.std

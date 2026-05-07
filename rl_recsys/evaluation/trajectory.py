@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Iterator, Protocol
 
@@ -35,8 +35,8 @@ class TrajectoryDataset(Protocol):
 @dataclass
 class TrajectoryEvaluation:
     agent: str
-    sessions: int
-    total_steps: int
+    sessions: int = field(metadata={"aggregate": False})
+    total_steps: int = field(metadata={"aggregate": False})
     avg_session_reward: float
     avg_discounted_return: float
     avg_session_length: float
@@ -44,7 +44,7 @@ class TrajectoryEvaluation:
     avg_per_step_ctr: float
     avg_per_step_ndcg: float
     avg_per_step_mrr: float
-    seconds: float
+    seconds: float = field(metadata={"aggregate": False})
 
     def as_dict(self) -> dict[str, float | int | str]:
         return {

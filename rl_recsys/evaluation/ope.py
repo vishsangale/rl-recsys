@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Callable, Protocol
 
@@ -27,7 +27,7 @@ class OPERecord:
 @dataclass
 class OPEEvaluation:
     agent: str
-    episodes: int
+    episodes: int = field(metadata={"aggregate": False})
     matches: int
     match_rate: float
     replay_value: float
@@ -36,7 +36,7 @@ class OPEEvaluation:
     swis_value: float
     dr_value: float
     avg_logged_reward: float
-    seconds: float
+    seconds: float = field(metadata={"aggregate": False})
 
     def as_dict(self) -> dict[str, float | int | str]:
         return {

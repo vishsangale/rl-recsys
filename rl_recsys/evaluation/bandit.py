@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 
 import numpy as np
@@ -13,14 +13,14 @@ from rl_recsys.training.metrics import ctr, discounted_return, mrr, ndcg_at_k
 @dataclass
 class BanditEvaluation:
     agent: str
-    episodes: int
+    episodes: int = field(metadata={"aggregate": False})
     avg_reward: float
     hit_rate: float
     ctr: float
     ndcg: float
     mrr: float
     discounted_return: float
-    seconds: float
+    seconds: float = field(metadata={"aggregate": False})
 
     def as_dict(self) -> dict[str, float | int | str]:
         return {
