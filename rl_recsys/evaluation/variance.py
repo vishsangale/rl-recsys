@@ -7,6 +7,10 @@ import numpy as np
 
 from rl_recsys.agents.base import Agent
 from rl_recsys.environments.base import RecEnv
+from rl_recsys.evaluation.trajectory import (
+    TrajectoryDataset,
+    evaluate_trajectory_agent,
+)
 from rl_recsys.evaluation.bandit import evaluate_bandit_agent
 
 
@@ -55,6 +59,32 @@ def evaluate_with_variance(
             make_agent(),
             agent_name=agent_name,
             episodes=episodes,
+            seed=base_seed + i,
+            gamma=gamma,
+        )
+        for i in range(n_seeds)
+    ]
+    mean, std = _aggregate_runs(results)
+    return VarianceEvaluation(mean=mean, std=std, n_seeds=n_seeds)
+
+
+def evaluate_trajectory_with_variance(
+    make_dataset: Callable[[], TrajectoryDataset],
+    make_agent: Callable[[], Agent],
+    *,
+    agent_name: str,
+    max_sessions: int,
+    n_seeds: int = 5,
+    base_seed: int = 42,
+    gamma: float = 0.95,
+) -> VarianceEvaluation:
+    """Run evaluate_trajectory_agent n_seeds times; return mean ± std per metric."""
+    results = [
+        evaluate_trajectory_agent(
+            make_dataset(),
+            make_agent(),
+            agent_name=agent_name,
+            max_sessions=max_sessions,
             seed=base_seed + i,
             gamma=gamma,
         )

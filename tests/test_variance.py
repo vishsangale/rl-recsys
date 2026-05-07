@@ -121,3 +121,60 @@ def test_evaluate_with_variance_introspects_dataclass_fields() -> None:
     assert mean["score"] == pytest.approx(3.0)
     assert mean["count"] == pytest.approx(12.0)
     assert std["score"] == pytest.approx(np.std([1.0, 3.0, 5.0]))
+
+
+def test_evaluate_trajectory_with_variance_returns_finite_mean_and_std(tmp_path) -> None:
+    import pandas as pd
+
+    from rl_recsys.agents import RandomAgent
+    from rl_recsys.data.loaders.finn_no_slate_trajectory import (
+        FinnNoSlateTrajectoryLoader,
+    )
+    from rl_recsys.evaluation.variance import evaluate_trajectory_with_variance
+
+    df = pd.DataFrame(
+        {
+            "request_id": [0, 1, 2, 3, 4, 5],
+            "user_id": [10, 10, 11, 11, 12, 12],
+            "clicks": [0, 1, 2, 0, 1, 3],
+            "slate": [
+                [100, 101, 102, 103, 104],
+                [200, 201, 202, 203, 204],
+                [300, 301, 302, 303, 304],
+                [400, 401, 402, 403, 404],
+                [500, 501, 502, 503, 504],
+                [600, 601, 602, 603, 604],
+            ],
+        }
+    )
+    path = tmp_path / "slates.parquet"
+    df.to_parquet(path, index=False)
+
+    result = evaluate_trajectory_with_variance(
+        make_dataset=lambda: FinnNoSlateTrajectoryLoader(
+            path, num_candidates=8, feature_dim=4, slate_size=3, seed=0
+        ),
+        make_agent=lambda: RandomAgent(slate_size=3, seed=0),
+        agent_name="random",
+        max_sessions=3,
+        n_seeds=3,
+        base_seed=0,
+    )
+
+    assert result.n_seeds == 3
+    for key in (
+        "sessions",
+        "total_steps",
+        "avg_session_reward",
+        "avg_discounted_return",
+        "avg_session_length",
+        "avg_session_hit_rate",
+        "avg_per_step_ctr",
+        "avg_per_step_ndcg",
+        "avg_per_step_mrr",
+        "seconds",
+    ):
+        assert key in result.mean
+        assert key in result.std
+        assert np.isfinite(result.mean[key])
+        assert np.isfinite(result.std[key])
