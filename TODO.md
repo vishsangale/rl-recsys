@@ -4,7 +4,24 @@ Items deferred from prior batches and observations that surfaced during runs. Or
 
 ## Next up
 
-(Backlog continues below.)
+### Make the RL4RS-B Sequential DR benchmark discriminative
+First end-to-end run on dataset B (commit `457c0fa`, 5K trajectories × 3 seeds, RTX 5080) produced:
+
+| Agent | avg_seq_dr_value | avg_logged_discounted_return |
+|---|---|---|
+| LinUCB | 10.565 ± 0.096 | 10.572 ± 0.096 |
+| Random | 10.433 ± 0.079 | 10.572 ± 0.096 |
+
+Pipeline is provably wired (finite, low-variance, logged baseline matches across agents). But all agents look like the behavior policy. Three stacked reasons:
+
+1. **Behavior model barely beats uniform.** Trained NLL = 5.168 vs uniform NLL `log(283) = 5.645`. Either RL4RS-B's logging policy really is near-flat or the MLP is undertrained at 5 epochs / batch_size=512. Try (a) more epochs, (b) wider MLP, (c) add positional / sequential context features.
+2. **LinUCB has zero history at evaluation time.** Benchmark constructs fresh `LinUCBAgent` per seed with identity `_a_matrix` and zero `_b_vector` → all `score_items` outputs equal → Boltzmann uniform → ratios ≈ 1. Need an offline-training pass over logged trajectories before evaluation, OR a stochastic-policy warmup that's actually learned.
+3. **Boltzmann shim at T=1.0 smooths heavily.** Even with a trained agent, T=1 with similar score magnitudes drives target probs toward uniform. Sweep T ∈ {0.1, 0.3, 1.0, 3.0} and report the curve.
+
+Probably attack (2) first — without LinUCB training the other two effects are masked.
+
+### Vectorize / GPU notes captured
+Training loop is now batched and runs on CUDA when available (commits `b3be8e4`, `457c0fa`). RTX 5080 epochs took ~2.7 min on 781K × 9 tuples / batch_size=512. The MLP is small (64-hidden, 1-output); GPU util was likely low. Consider larger batch_size (4096+) on real runs to amortize launch overhead.
 
 ## Loader / data
 
