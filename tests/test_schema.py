@@ -1,9 +1,6 @@
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 import pytest
 
 from rl_recsys.data.schema import validate_parquet_schema
