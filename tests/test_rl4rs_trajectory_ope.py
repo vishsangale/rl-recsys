@@ -64,3 +64,59 @@ def test_loader_emits_trajectories_grouped_by_session(tmp_path: Path) -> None:
     for t in trajectories:
         for step in t:
             assert 0.0 < step.propensity <= 1.0
+
+
+def test_end_to_end_seq_dr_on_synthetic_b_fixture(tmp_path: Path) -> None:
+    # Write a tiny multi-step parquet, fit BehaviorPolicy, build the loader,
+    # run evaluate_trajectory_ope_agent, assert avg_seq_dr_value is finite
+    # and ess is reported.
+    rng = np.random.default_rng(0)
+    rows = []
+    for sid in range(40):
+        for seq in range(2):
+            rows.append({
+                "session_id": sid,
+                "sequence_id": seq,
+                "user_state": rng.standard_normal(2).tolist(),
+                "slate": [rng.integers(0, 3), rng.integers(0, 3)],
+                "user_feedback": [int(rng.integers(0, 2)), int(rng.integers(0, 2))],
+                "item_features": [[0.0, 0.0], [1.0, 0.0]],
+                "candidate_ids": [0, 1, 2],
+                "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
+            })
+    parquet = tmp_path / "sessions_b.parquet"
+    pd.DataFrame(rows).to_parquet(parquet, index=False)
+
+    from rl_recsys.evaluation.behavior_policy import (
+        fit_behavior_policy_with_calibration,
+    )
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    from rl_recsys.evaluation import evaluate_trajectory_ope_agent
+
+    model = fit_behavior_policy_with_calibration(
+        parquet, user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        epochs=5, batch_size=16, seed=0, nll_threshold=10.0,
+    )
+
+    class _FlatScoreAgent:
+        def select_slate(self, obs):
+            return np.array([0, 1], dtype=np.int64)
+        def score_items(self, obs):
+            return np.zeros(len(obs.candidate_features), dtype=np.float64)
+        def update(self, *a, **kw):
+            return {}
+
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    result = evaluate_trajectory_ope_agent(
+        source, _FlatScoreAgent(), agent_name="flat",
+        max_trajectories=40, seed=0, gamma=0.9, temperature=1.0,
+    )
+
+    assert np.isfinite(result.avg_seq_dr_value)
+    assert np.isfinite(result.avg_logged_discounted_return)
+    assert result.ess > 0.0
+    assert result.trajectories > 0

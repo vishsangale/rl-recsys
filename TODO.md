@@ -4,20 +4,7 @@ Items deferred from prior batches and observations that surfaced during runs. Or
 
 ## Next up
 
-### Real-data Sequential DR
-The pure `seq_dr_value` estimator and `evaluate_trajectory_ope_agent` orchestrator are shipped (verified end-to-end on a synthetic source). What's left for real-dataset use, after inspecting the raw RL4RS CSVs:
-
-**Findings from raw-CSV inspection (2026-05-07):**
-- `rl4rs_dataset_a_rl.csv` (current pipeline target) is **inherently single-step** — every `session_id` has exactly one row. T=1 always, so Seq DR collapses to bandit DR there.
-- `rl4rs_dataset_b_rl.csv` is multi-step but trajectories are **short** (mean 1.78 steps/session, max 4). Real-data Seq DR will run on B but won't dramatically differ from bandit DR at γ=0.95.
-- Neither CSV logs per-step propensities. `behavior_policy_id` is constant (=1) — one logging policy, no action probabilities. Need an **estimated** behavior model.
-
-**Work:**
-- **Design note first** (use brainstorming skill): pick (a) action space — clicked-item-id vs slate-as-action vs per-position, (b) behavior-model class for propensity estimation, (c) target-probability definition for non-Random agents (current top-1 indicator collapses W to 0 most of the time on a 9-item slate).
-- **Extend RL4RS pipeline** to also process dataset B and write per-step propensities to `sessions_b.parquet`.
-- **Fit behavior-policy model** on logged `(context → clicked-item)` pairs; evaluate calibration before using its outputs as propensities.
-- **Build a `LoggedTrajectorySource` impl** over the new parquet — yields `LoggedTrajectoryStep`s with estimated propensity.
-- **Add `evaluate_trajectory_ope_with_variance`** sibling once a real source exists to drive it.
+(Backlog continues below.)
 
 ## Loader / data
 
