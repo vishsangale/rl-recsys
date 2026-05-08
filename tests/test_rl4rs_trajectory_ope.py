@@ -2,8 +2,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
-import torch
 
 from rl_recsys.evaluation.behavior_policy import BehaviorPolicy
 from rl_recsys.evaluation.ope_trajectory import LoggedTrajectoryStep
