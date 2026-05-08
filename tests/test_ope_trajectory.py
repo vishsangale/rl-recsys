@@ -108,13 +108,21 @@ class _SyntheticTrajectorySource:
 
 
 class _DetAgent:
-    """Always picks slate=[0] — top action is candidate index 0."""
+    """Always picks slate=[0] — top action is candidate index 0.
+
+    score_items returns a flat-zero score so target probability under the
+    Boltzmann shim is uniform 1/num_candidates per position. This keeps
+    expected values hand-computable in aggregation tests.
+    """
 
     def __init__(self, slate_size: int = 1) -> None:
         self._slate_size = slate_size
 
     def select_slate(self, obs: RecObs) -> np.ndarray:
         return np.arange(self._slate_size, dtype=np.int64)
+
+    def score_items(self, obs: RecObs) -> np.ndarray:
+        return np.zeros(len(obs.candidate_features), dtype=np.float64)
 
     def update(
         self,
@@ -128,36 +136,43 @@ class _DetAgent:
 
 
 def test_evaluate_trajectory_ope_agent_aggregates_per_trajectory() -> None:
-    # _DetAgent picks index 0; logged_action=0 → target_prob=1.0 for non-Random agents.
-    # Trajectory A (2 steps): rewards=[1.0, 0.0], propensity=[0.5, 0.5]
-    #   w = [2.0, 2.0]; W = [2.0, 4.0]; b = mean([1, 0]) = 0.5
-    #   V_A(γ=0.9) = 1*(2*(1-0.5)+0.5) + 0.9*(4*(0-0.5)+0.5) = 1.5 + 0.9*(-1.5) = 0.15
-    # Trajectory B (1 step): rewards=[2.0], propensity=[1.0]
-    #   w = [1.0]; W = [1.0]; b = 2.0; V_B = 1*(1*(2-2)+2) = 2.0
-    # avg_seq_dr = (0.15 + 2.0) / 2 = 1.075
-    # avg_logged_discounted_return:
-    #   Logged_A(γ=0.9) = 1.0 + 0.9*0.0 = 1.0
-    #   Logged_B = 2.0
-    #   avg = 1.5
+    # _DetAgent (flat scores) under T=1.0 → softmax uniform = 1/4 per position.
+    # slate_size=1 → π(slate | obs) = 0.25 every step.
+    # Trajectory A (2 steps): rewards=[1, 0], propensity=[0.5, 0.5]
+    #   w = clip(0.25/0.5) = 0.5; W = [0.5, 0.25]; b = mean([1,0]) = 0.5
+    #   V_A(γ=0.9) = 1*(0.5*0.5+0.5) + 0.9*(0.25*-0.5+0.5) = 0.75 + 0.9*0.375 = 1.0875
+    # Trajectory B (1 step): rewards=[2], propensity=[1.0]
+    #   w = clip(0.25/1.0) = 0.25; b = 2.0
+    #   V_B = 1*(0.25*0+2) = 2.0
     obs = _make_obs(num_candidates=4)
     traj_a = [
-        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=1.0, propensity=0.5),
-        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=0.0, propensity=0.5),
+        LoggedTrajectoryStep(
+            obs=obs, logged_action=np.array([0], dtype=np.int64),
+            logged_reward=1.0, propensity=0.5,
+        ),
+        LoggedTrajectoryStep(
+            obs=obs, logged_action=np.array([0], dtype=np.int64),
+            logged_reward=0.0, propensity=0.5,
+        ),
     ]
     traj_b = [
-        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=2.0, propensity=1.0),
+        LoggedTrajectoryStep(
+            obs=obs, logged_action=np.array([0], dtype=np.int64),
+            logged_reward=2.0, propensity=1.0,
+        ),
     ]
     source = _SyntheticTrajectorySource(trajectories=[traj_a, traj_b])
     agent = _DetAgent(slate_size=1)
 
     result = evaluate_trajectory_ope_agent(
-        source, agent, agent_name="det", max_trajectories=2, seed=0, gamma=0.9
+        source, agent, agent_name="det",
+        max_trajectories=2, seed=0, gamma=0.9, temperature=1.0,
     )
 
     assert isinstance(result, TrajectoryOPEEvaluation)
     assert result.trajectories == 2
     assert result.total_steps == 3
-    assert result.avg_seq_dr_value == pytest.approx((0.15 + 2.0) / 2)
+    assert result.avg_seq_dr_value == pytest.approx((1.0875 + 2.0) / 2)
     assert result.avg_logged_discounted_return == pytest.approx((1.0 + 2.0) / 2)
 
 
@@ -205,15 +220,15 @@ def test_evaluate_trajectory_ope_agent_raises_when_all_trajectories_empty() -> N
 
 
 def test_evaluate_trajectory_ope_agent_uses_uniform_target_prob_for_random_agent() -> None:
-    # RandomAgent branch of _target_probability returns 1/num_candidates.
-    # 4 candidates → target_prob = 0.25 at every step.
+    # RandomAgent.score_items returns zeros → softmax uniform = 1/4 per position.
+    # slate_size=1 → target_prob = 0.25 at every step.
     # 2 steps, rewards=[1.0, 0.0], propensity=[0.5, 0.5], reward_model=0:
     #   w = clip([0.5, 0.5]) = [0.5, 0.5]; W = [0.5, 0.25]
     #   γ=1: V = 1*(0.5*1 + 0) + 1*(0.25*0 + 0) = 0.5
     obs = _make_obs(num_candidates=4)
     traj = [
-        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=1.0, propensity=0.5),
-        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=0.0, propensity=0.5),
+        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0, propensity=0.5),
+        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=0.0, propensity=0.5),
     ]
     source = _SyntheticTrajectorySource(trajectories=[traj])
     agent = RandomAgent(slate_size=1, seed=0)
@@ -234,7 +249,7 @@ def test_evaluate_trajectory_ope_agent_does_not_mutate_agent_state() -> None:
         candidate_ids=np.arange(4, dtype=np.int64),
     )
     step = LoggedTrajectoryStep(
-        obs=obs, logged_action=0, logged_reward=1.0, propensity=0.5
+        obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0, propensity=0.5
     )
     source = _SyntheticTrajectorySource(trajectories=[[step] * 5])
     agent = LinUCBAgent(slate_size=1, user_dim=4, item_dim=4, alpha=1.0)
@@ -247,3 +262,69 @@ def test_evaluate_trajectory_ope_agent_does_not_mutate_agent_state() -> None:
 
     assert np.array_equal(agent._a_matrix, a_before)
     assert np.array_equal(agent._b_vector, b_before)
+
+
+def test_target_probability_boltzmann_factorized_over_slate() -> None:
+    from rl_recsys.evaluation.ope_trajectory import _target_probability
+
+    class _ScoredAgent:
+        def score_items(self, obs):
+            return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+        def select_slate(self, obs):
+            return np.array([0, 1], dtype=np.int64)
+
+    obs = _make_obs(num_candidates=4)
+    agent = _ScoredAgent()
+    # softmax([1,0,0,0]/1.0) = [e/(e+3), 1/(e+3), 1/(e+3), 1/(e+3)]
+    e = float(np.e)
+    p0 = e / (e + 3.0)
+    p1 = 1.0 / (e + 3.0)
+    # logged_slate=[0,1] → target prob = p0 * p1
+    expected = p0 * p1
+
+    result = _target_probability(
+        agent, obs,
+        agent_slate=np.array([0, 1], dtype=np.int64),
+        logged_slate=np.array([0, 1], dtype=np.int64),
+        temperature=1.0,
+    )
+
+    assert result == pytest.approx(expected)
+
+
+def test_target_probability_raises_on_nonpositive_temperature() -> None:
+    from rl_recsys.evaluation.ope_trajectory import _target_probability
+
+    class _ScoredAgent:
+        def score_items(self, obs):
+            return np.zeros(4, dtype=np.float64)
+
+    obs = _make_obs(num_candidates=4)
+    with pytest.raises(ValueError, match="temperature"):
+        _target_probability(
+            _ScoredAgent(), obs,
+            agent_slate=np.array([0], dtype=np.int64),
+            logged_slate=np.array([0], dtype=np.int64),
+            temperature=0.0,
+        )
+
+
+def test_evaluate_trajectory_ope_agent_raises_when_agent_lacks_score_items() -> None:
+    class _NoScoresAgent:
+        def select_slate(self, obs):
+            return np.array([0], dtype=np.int64)
+
+    obs = _make_obs(num_candidates=4)
+    step = LoggedTrajectoryStep(
+        obs=obs,
+        logged_action=np.array([0], dtype=np.int64),
+        logged_reward=1.0,
+        propensity=0.5,
+    )
+    source = _SyntheticTrajectorySource(trajectories=[[step]])
+
+    with pytest.raises(AttributeError, match="score_items"):
+        evaluate_trajectory_ope_agent(
+            source, _NoScoresAgent(), agent_name="x",
+            max_trajectories=1, seed=0,
+        )

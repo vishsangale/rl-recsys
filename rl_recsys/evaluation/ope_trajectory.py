@@ -7,7 +7,6 @@ from typing import Callable, Iterator, Protocol
 import numpy as np
 
 from rl_recsys.agents.base import Agent
-from rl_recsys.agents.random import RandomAgent
 from rl_recsys.environments.base import RecObs
 from rl_recsys.evaluation.ope import _validate_ope_arrays
 from rl_recsys.training.metrics import discounted_return
@@ -46,9 +45,9 @@ def seq_dr_value(
 @dataclass(frozen=True)
 class LoggedTrajectoryStep:
     obs: RecObs
-    logged_action: int
+    logged_action: np.ndarray  # shape (slate_size,) — the logged slate, item ids
     logged_reward: float
-    propensity: float
+    propensity: float          # μ(slate | obs) = Π_k μ(slate[k] | obs, k)
 
 
 class LoggedTrajectorySource(Protocol):
@@ -79,11 +78,28 @@ class TrajectoryOPEEvaluation:
 
 
 def _target_probability(
-    agent: Agent, obs: RecObs, top_action: int, logged_action: int
+    agent: Agent,
+    obs: RecObs,
+    agent_slate: np.ndarray,
+    logged_slate: np.ndarray,
+    *,
+    temperature: float,
 ) -> float:
-    if isinstance(agent, RandomAgent):
-        return float(1.0 / len(obs.candidate_ids))
-    return float(top_action == logged_action)
+    """π_target(logged_slate | obs) under a temperature-softmax shim of agent.
+
+    π(item_k | obs) = softmax(agent.score_items(obs) / T)[item_k]
+    π(slate | obs) = Π_k π(slate[k] | obs)
+    """
+    if temperature <= 0:
+        raise ValueError(f"temperature must be positive, got {temperature}")
+    scores = np.asarray(agent.score_items(obs), dtype=np.float64)
+    # Numerically stable softmax: subtract max before exp.
+    z = scores / temperature
+    z = z - z.max()
+    exp_z = np.exp(z)
+    probs = exp_z / exp_z.sum()
+    logged = np.asarray(logged_slate, dtype=np.int64)
+    return float(np.prod(probs[logged]))
 
 
 def evaluate_trajectory_ope_agent(
@@ -96,12 +112,13 @@ def evaluate_trajectory_ope_agent(
     gamma: float = 0.95,
     reward_model: Callable[[int], float] | None = None,
     clip: tuple[float, float] = (0.1, 10.0),
+    temperature: float = 1.0,
 ) -> TrajectoryOPEEvaluation:
-    """Sequential DR off-policy evaluator.
+    """Sequential DR off-policy evaluator with slate-as-action.
 
     For each trajectory, the agent picks a slate per step. Per-step target
-    probability is 1/num_candidates for RandomAgent or 1.0/0.0 indicator for
-    deterministic agents. agent.update() is NOT called.
+    probability uses a Boltzmann shim over agent.score_items: π(slate | obs) =
+    Π_k softmax(scores / T)[slate[k]]. agent.update() is NOT called.
 
     Empty trajectories yielded by ``source`` are silently skipped — they have
     no steps to score and would make ``seq_dr_value`` raise. If every yielded
@@ -110,6 +127,11 @@ def evaluate_trajectory_ope_agent(
     """
     if max_trajectories <= 0:
         raise ValueError("max_trajectories must be positive")
+    if not hasattr(agent, "score_items"):
+        raise AttributeError(
+            f"agent {agent_name!r} must implement score_items(obs) -> np.ndarray "
+            "for slate OPE under the Boltzmann target-probability shim"
+        )
 
     started = perf_counter()
     seq_dr_per_traj: list[float] = []
@@ -123,12 +145,16 @@ def evaluate_trajectory_ope_agent(
         target_probs: list[float] = []
         propensities: list[float] = []
         for step in traj:
-            slate = np.asarray(agent.select_slate(step.obs), dtype=np.int64)
-            if len(slate) == 0:
+            agent_slate = np.asarray(agent.select_slate(step.obs), dtype=np.int64)
+            if len(agent_slate) == 0:
                 raise ValueError("agent returned an empty slate")
-            top_action = int(slate[0])
             target_probs.append(
-                _target_probability(agent, step.obs, top_action, step.logged_action)
+                _target_probability(
+                    agent, step.obs,
+                    agent_slate=agent_slate,
+                    logged_slate=np.asarray(step.logged_action, dtype=np.int64),
+                    temperature=temperature,
+                )
             )
             rewards.append(float(step.logged_reward))
             propensities.append(float(step.propensity))
