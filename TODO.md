@@ -10,12 +10,6 @@ The pure `seq_dr_value` estimator and `evaluate_trajectory_ope_agent` orchestrat
 - **Build a `LoggedTrajectorySource` impl** for the fixed RL4RS data — yields `LoggedTrajectoryStep`s with per-step propensity.
 - **Add `evaluate_trajectory_ope_with_variance`** sibling once a real source exists to drive it.
 
-### Sequential DR API polish
-Non-blocking items the final review flagged:
-- Document the empty-trajectory skip policy in `evaluate_trajectory_ope_agent` (currently silently skips empty trajectories — pick raise-vs-skip and document).
-- Add raise-path tests: `max_trajectories <= 0`, all-empty source, RandomAgent branch of `_target_probability`.
-- Add a standalone T=1 `seq_dr_value` test confirming the bandit-collapse case explicitly.
-
 ## Loader / data
 
 ### Loader init perf at scale

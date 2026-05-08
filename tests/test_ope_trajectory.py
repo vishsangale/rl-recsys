@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from rl_recsys.agents import LinUCBAgent
+from rl_recsys.agents.random import RandomAgent
 from rl_recsys.environments.base import RecObs
 from rl_recsys.evaluation.ope_trajectory import (
     LoggedTrajectoryStep,
@@ -158,6 +159,71 @@ def test_evaluate_trajectory_ope_agent_aggregates_per_trajectory() -> None:
     assert result.total_steps == 3
     assert result.avg_seq_dr_value == pytest.approx((0.15 + 2.0) / 2)
     assert result.avg_logged_discounted_return == pytest.approx((1.0 + 2.0) / 2)
+
+
+def test_seq_dr_value_t1_collapses_to_bandit_dr_formula() -> None:
+    # T=1 → V = w*(r-b) + b, the bandit per-sample DR formula.
+    rewards = np.array([2.0])
+    target_probs = np.array([0.6])
+    propensities = np.array([0.3])
+    # w = clip(2.0) = 2.0; W=[2.0]; b=[1.0]; γ^0=1
+    # V = 2.0 * (2.0 - 1.0) + 1.0 = 3.0
+    expected = 3.0
+
+    result = seq_dr_value(
+        rewards, target_probs, propensities,
+        gamma=0.95, reward_model=lambda i: 1.0,
+    )
+
+    assert result == pytest.approx(expected)
+
+
+def test_evaluate_trajectory_ope_agent_raises_on_nonpositive_max_trajectories() -> None:
+    source = _SyntheticTrajectorySource(trajectories=[])
+    agent = _DetAgent(slate_size=1)
+
+    with pytest.raises(ValueError, match="max_trajectories must be positive"):
+        evaluate_trajectory_ope_agent(
+            source, agent, agent_name="det", max_trajectories=0, seed=0
+        )
+    with pytest.raises(ValueError, match="max_trajectories must be positive"):
+        evaluate_trajectory_ope_agent(
+            source, agent, agent_name="det", max_trajectories=-1, seed=0
+        )
+
+
+def test_evaluate_trajectory_ope_agent_raises_when_all_trajectories_empty() -> None:
+    # Empty trajectories are skipped; if every one is empty the averages would
+    # be undefined, so the evaluator must raise rather than return NaN.
+    source = _SyntheticTrajectorySource(trajectories=[[], [], []])
+    agent = _DetAgent(slate_size=1)
+
+    with pytest.raises(ValueError, match="source produced zero trajectories"):
+        evaluate_trajectory_ope_agent(
+            source, agent, agent_name="det", max_trajectories=3, seed=0
+        )
+
+
+def test_evaluate_trajectory_ope_agent_uses_uniform_target_prob_for_random_agent() -> None:
+    # RandomAgent branch of _target_probability returns 1/num_candidates.
+    # 4 candidates → target_prob = 0.25 at every step.
+    # 2 steps, rewards=[1.0, 0.0], propensity=[0.5, 0.5], reward_model=0:
+    #   w = clip([0.5, 0.5]) = [0.5, 0.5]; W = [0.5, 0.25]
+    #   γ=1: V = 1*(0.5*1 + 0) + 1*(0.25*0 + 0) = 0.5
+    obs = _make_obs(num_candidates=4)
+    traj = [
+        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=1.0, propensity=0.5),
+        LoggedTrajectoryStep(obs=obs, logged_action=0, logged_reward=0.0, propensity=0.5),
+    ]
+    source = _SyntheticTrajectorySource(trajectories=[traj])
+    agent = RandomAgent(slate_size=1, seed=0)
+
+    result = evaluate_trajectory_ope_agent(
+        source, agent, agent_name="random",
+        max_trajectories=1, seed=0, gamma=1.0, reward_model=lambda i: 0.0,
+    )
+
+    assert result.avg_seq_dr_value == pytest.approx(0.5)
 
 
 def test_evaluate_trajectory_ope_agent_does_not_mutate_agent_state() -> None:

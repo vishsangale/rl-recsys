@@ -102,6 +102,11 @@ def evaluate_trajectory_ope_agent(
     For each trajectory, the agent picks a slate per step. Per-step target
     probability is 1/num_candidates for RandomAgent or 1.0/0.0 indicator for
     deterministic agents. agent.update() is NOT called.
+
+    Empty trajectories yielded by ``source`` are silently skipped — they have
+    no steps to score and would make ``seq_dr_value`` raise. If every yielded
+    trajectory is empty (or ``source`` yields nothing), the run raises
+    ``ValueError`` because the resulting averages would be undefined.
     """
     if max_trajectories <= 0:
         raise ValueError("max_trajectories must be positive")
