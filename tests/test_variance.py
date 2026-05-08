@@ -180,3 +180,63 @@ def test_evaluate_trajectory_with_variance_returns_finite_mean_and_std(tmp_path)
     for skipped in ("sessions", "total_steps", "seconds"):
         assert skipped not in result.mean
         assert skipped not in result.std
+
+
+def test_evaluate_trajectory_ope_with_variance_smoke() -> None:
+    import numpy as np
+
+    from rl_recsys.environments.base import RecObs
+    from rl_recsys.evaluation import (
+        evaluate_trajectory_ope_with_variance, LoggedTrajectoryStep,
+    )
+
+    obs = RecObs(
+        user_features=np.zeros(2, dtype=np.float64),
+        candidate_features=np.zeros((3, 2), dtype=np.float64),
+        candidate_ids=np.arange(3, dtype=np.int64),
+    )
+    traj = [
+        LoggedTrajectoryStep(
+            obs=obs,
+            logged_action=np.array([0, 1], dtype=np.int64),
+            logged_reward=1.0,
+            propensity=0.3,
+        ),
+        LoggedTrajectoryStep(
+            obs=obs,
+            logged_action=np.array([0, 1], dtype=np.int64),
+            logged_reward=0.0,
+            propensity=0.3,
+        ),
+    ]
+
+    class _FixedSource:
+        def iter_trajectories(self, *, max_trajectories=None, seed=None):
+            yield traj
+
+    class _FlatScoreAgent:
+        def select_slate(self, obs):
+            return np.array([0, 1], dtype=np.int64)
+        def score_items(self, obs):
+            return np.zeros(3, dtype=np.float64)
+        def update(self, *args, **kwargs):
+            return {}
+
+    result = evaluate_trajectory_ope_with_variance(
+        make_source=lambda: _FixedSource(),
+        make_agent=lambda: _FlatScoreAgent(),
+        agent_name="flat",
+        max_trajectories=1,
+        n_seeds=3,
+        base_seed=42,
+        gamma=0.9,
+        temperature=1.0,
+    )
+
+    assert "avg_seq_dr_value" in result.mean
+    assert "avg_logged_discounted_return" in result.mean
+    assert isinstance(result.mean["avg_seq_dr_value"], float)
+    assert "avg_seq_dr_value" in result.std
+    assert result.n_seeds == 3
+    # Deterministic source → std == 0 across seeds
+    assert result.std["avg_seq_dr_value"] == 0.0

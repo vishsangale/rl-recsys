@@ -26,6 +26,7 @@ from rl_recsys.evaluation.trajectory import (
 )
 from rl_recsys.evaluation.variance import (
     VarianceEvaluation,
+    evaluate_trajectory_ope_with_variance,
     evaluate_trajectory_with_variance,
     evaluate_with_variance,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "evaluate_ope_agent",
     "evaluate_trajectory_agent",
     "evaluate_trajectory_ope_agent",
+    "evaluate_trajectory_ope_with_variance",
     "evaluate_trajectory_with_variance",
     "evaluate_with_variance",
     "ips_value",

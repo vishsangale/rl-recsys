@@ -12,6 +12,9 @@ from rl_recsys.evaluation.trajectory import (
     evaluate_trajectory_agent,
 )
 from rl_recsys.evaluation.bandit import evaluate_bandit_agent
+from rl_recsys.evaluation.ope_trajectory import (
+    LoggedTrajectorySource, evaluate_trajectory_ope_agent,
+)
 
 
 @dataclass
@@ -94,6 +97,38 @@ def evaluate_trajectory_with_variance(
             max_sessions=max_sessions,
             seed=base_seed + i,
             gamma=gamma,
+        )
+        for i in range(n_seeds)
+    ]
+    mean, std = _aggregate_runs(results)
+    return VarianceEvaluation(mean=mean, std=std, n_seeds=n_seeds)
+
+
+def evaluate_trajectory_ope_with_variance(
+    make_source: Callable[[], LoggedTrajectorySource],
+    make_agent: Callable[[], Agent],
+    *,
+    agent_name: str,
+    max_trajectories: int,
+    n_seeds: int = 5,
+    base_seed: int = 42,
+    gamma: float = 0.95,
+    reward_model: Callable[[int], float] | None = None,
+    clip: tuple[float, float] = (0.1, 10.0),
+    temperature: float = 1.0,
+) -> VarianceEvaluation:
+    """Run evaluate_trajectory_ope_agent n_seeds times; return mean ± std."""
+    results = [
+        evaluate_trajectory_ope_agent(
+            make_source(),
+            make_agent(),
+            agent_name=agent_name,
+            max_trajectories=max_trajectories,
+            seed=base_seed + i,
+            gamma=gamma,
+            reward_model=reward_model,
+            clip=clip,
+            temperature=temperature,
         )
         for i in range(n_seeds)
     ]
