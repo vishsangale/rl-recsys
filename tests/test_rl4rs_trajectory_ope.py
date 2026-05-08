@@ -11,19 +11,13 @@ def _fixture_b_parquet(tmp_path: Path) -> Path:
     rows = [
         {"session_id": 1, "sequence_id": 1, "user_state": [1.0, 0.0],
          "slate": [10, 11], "user_feedback": [1, 0],
-         "item_features": [[0.0, 0.0], [1.0, 0.0]],
-         "candidate_ids": [10, 11, 12],
-         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]]},
+         "item_features": [[0.0, 0.0], [1.0, 0.0]]},
         {"session_id": 1, "sequence_id": 2, "user_state": [1.0, 0.0],
          "slate": [11, 12], "user_feedback": [0, 1],
-         "item_features": [[1.0, 0.0], [0.5, 0.5]],
-         "candidate_ids": [10, 11, 12],
-         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]]},
+         "item_features": [[1.0, 0.0], [0.5, 0.5]]},
         {"session_id": 2, "sequence_id": 1, "user_state": [0.0, 1.0],
          "slate": [10, 12], "user_feedback": [0, 0],
-         "item_features": [[0.0, 0.0], [0.5, 0.5]],
-         "candidate_ids": [10, 11, 12],
-         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]]},
+         "item_features": [[0.0, 0.0], [0.5, 0.5]]},
     ]
     p = tmp_path / "sessions_b.parquet"
     pd.DataFrame(rows).to_parquet(p, index=False)
@@ -81,8 +75,6 @@ def test_end_to_end_seq_dr_on_synthetic_b_fixture(tmp_path: Path) -> None:
                 "slate": [rng.integers(0, 3), rng.integers(0, 3)],
                 "user_feedback": [int(rng.integers(0, 2)), int(rng.integers(0, 2))],
                 "item_features": [[0.0, 0.0], [1.0, 0.0]],
-                "candidate_ids": [0, 1, 2],
-                "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
             })
     parquet = tmp_path / "sessions_b.parquet"
     pd.DataFrame(rows).to_parquet(parquet, index=False)

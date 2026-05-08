@@ -45,19 +45,10 @@ def test_process_b_emits_multistep_parquet_with_required_columns(tmp_path: Path)
     df = pd.read_parquet(out)
     expected_cols = {
         "session_id", "sequence_id", "user_state", "slate", "item_features",
-        "user_feedback", "candidate_ids", "candidate_features",
+        "user_feedback",
     }
     assert expected_cols.issubset(set(df.columns))
     # 3 rows = 3 steps total across both sessions
     assert len(df) == 3
     # Session 1 has 2 sequence_ids
     assert set(df[df["session_id"] == 1]["sequence_id"]) == {1, 2}
-    # candidate_ids universe = all unique items {10,11,12,13,14,15}
-    universe = set()
-    for ids in df["candidate_ids"]:
-        universe.update(ids)
-    assert universe == {10, 11, 12, 13, 14, 15}
-    # All rows share the same candidate universe (same length, sorted)
-    first = list(df["candidate_ids"].iloc[0])
-    for row_ids in df["candidate_ids"]:
-        assert list(row_ids) == first

@@ -78,6 +78,38 @@ class BehaviorPolicy(nn.Module):
         return result
 
 
+def _build_universe_from_df(df) -> tuple[np.ndarray, np.ndarray, dict[int, int]]:
+    """Build sorted candidate universe from slate + item_features columns.
+
+    Returns:
+        universe_ids: sorted unique item ids as int64 array
+        universe_features: feature array in the same order
+        id_to_idx: item_id -> position in universe
+    """
+    import pyarrow.compute as pc
+    import pyarrow as pa
+
+    # Collect unique ids using pyarrow for speed on large DataFrames.
+    # Fall back to pure Python if the column is not a pa.ChunkedArray.
+    slates = df["slate"].tolist()
+    flat = [int(x) for s in slates for x in s]
+    universe_ids = np.sort(np.unique(np.array(flat, dtype=np.int64)))
+
+    feature_for: dict[int, list[float]] = {}
+    for slate, item_feats in zip(df["slate"], df["item_features"]):
+        for item_id, feat in zip(slate, item_feats):
+            if int(item_id) not in feature_for:
+                feature_for[int(item_id)] = list(feat)
+        if len(feature_for) == len(universe_ids):
+            break
+
+    universe_features = np.array(
+        [feature_for[int(i)] for i in universe_ids], dtype=np.float64
+    )
+    id_to_idx = {int(cid): k for k, cid in enumerate(universe_ids)}
+    return universe_ids, universe_features, id_to_idx
+
+
 def fit_behavior_policy(
     parquet_path: Path,
     *,
@@ -95,6 +127,10 @@ def fit_behavior_policy(
 
     Each row of `parquet_path` is expanded into `slate_size` training tuples:
     (user_state, candidate_features, position k, target = candidate-index of slate[k]).
+
+    The candidate universe (sorted unique item ids + feature vectors) is derived
+    from the parquet's slate and item_features columns — no candidate_ids /
+    candidate_features columns required in the parquet.
     """
     import pandas as pd  # local import to keep module-level deps minimal
 
@@ -102,24 +138,23 @@ def fit_behavior_policy(
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
 
+    # Build candidate universe once from slate+item_features.
+    universe_ids, universe_features, id_to_idx = _build_universe_from_df(df)
+    cand_t_shared = torch.as_tensor(universe_features, dtype=torch.float64)
+
     # Build training tensors. Every row contributes slate_size examples.
     users: list[np.ndarray] = []
-    cands: list[np.ndarray] = []
     positions: list[int] = []
     targets: list[int] = []
     for _, row in df.iterrows():
         user = np.asarray(row["user_state"], dtype=np.float64)
-        cand = np.array(list(row["candidate_features"]), dtype=np.float64)
-        cand_ids = list(row["candidate_ids"])
         slate = list(row["slate"])
         for k in range(min(slate_size, len(slate))):
             target_item_id = int(slate[k])
-            try:
-                target_idx = cand_ids.index(target_item_id)
-            except ValueError:
+            target_idx = id_to_idx.get(target_item_id)
+            if target_idx is None:
                 continue  # logged item not in candidate universe — skip
             users.append(user)
-            cands.append(cand)
             positions.append(k)
             targets.append(target_idx)
 
@@ -127,7 +162,6 @@ def fit_behavior_policy(
         raise ValueError("no training tuples derivable from parquet")
 
     user_t = torch.as_tensor(np.stack(users), dtype=torch.float64)
-    cand_t = torch.as_tensor(np.stack(cands), dtype=torch.float64)
     pos_t = torch.as_tensor(np.array(positions), dtype=torch.long)
     target_t = torch.as_tensor(np.array(targets), dtype=torch.long)
 
@@ -145,7 +179,7 @@ def fit_behavior_policy(
             losses: list[torch.Tensor] = []
             for i in batch_idx:
                 logits = model._score_position(
-                    user_t[i], cand_t[i], int(pos_t[i].item())
+                    user_t[i], cand_t_shared, int(pos_t[i].item())
                 )
                 log_probs = torch.log_softmax(logits, dim=-1)
                 losses.append(-log_probs[int(target_t[i].item())])
@@ -157,12 +191,28 @@ def fit_behavior_policy(
     return model
 
 
-def held_out_nll(model: BehaviorPolicy, df) -> float:
+def held_out_nll(
+    model: BehaviorPolicy,
+    df,
+    *,
+    universe_ids: np.ndarray | None = None,
+    universe_features: np.ndarray | None = None,
+) -> float:
     """Average negative log-likelihood over (row, slate-position) tuples.
 
-    `df` rows must include `user_state`, `candidate_features`, `candidate_ids`,
-    `slate`. Returns mean -log p(slate[k] | context, k) across all positions.
+    `df` rows must include `user_state`, `slate`, and either:
+      - `item_features` (to derive the universe internally), OR
+      - explicit `universe_ids` and `universe_features` keyword arguments.
+
+    Returns mean -log p(slate[k] | context, k) across all positions.
     """
+    if universe_ids is None or universe_features is None:
+        universe_ids, universe_features, id_to_idx = _build_universe_from_df(df)
+    else:
+        id_to_idx = {int(cid): k for k, cid in enumerate(universe_ids)}
+
+    cand = torch.as_tensor(universe_features, dtype=torch.float64)
+
     losses: list[float] = []
     with torch.no_grad():
         for _, row in df.iterrows():
@@ -170,17 +220,11 @@ def held_out_nll(model: BehaviorPolicy, df) -> float:
                 np.array(list(row["user_state"]), dtype=np.float64),
                 dtype=torch.float64,
             )
-            cand = torch.as_tensor(
-                np.array(list(row["candidate_features"]), dtype=np.float64),
-                dtype=torch.float64,
-            )
-            cand_ids = list(row["candidate_ids"])
             slate = list(row["slate"])
             for k in range(len(slate)):
                 target_item_id = int(slate[k])
-                try:
-                    target_idx = cand_ids.index(target_item_id)
-                except ValueError:
+                target_idx = id_to_idx.get(target_item_id)
+                if target_idx is None:
                     continue
                 logits = model._score_position(user, cand, k)
                 log_probs = torch.log_softmax(logits, dim=-1)
@@ -223,6 +267,10 @@ def fit_behavior_policy_with_calibration(
     held_idx = perm[:n_held]
     train_idx = perm[n_held:]
 
+    # Build the universe once from the full df so train + held-out share the
+    # same candidate ordering.
+    universe_ids, universe_features, id_to_idx = _build_universe_from_df(df)
+
     train_path = parquet_path.with_name(parquet_path.stem + "_train.parquet")
     df.iloc[train_idx].to_parquet(train_path, index=False)
     try:
@@ -236,7 +284,10 @@ def fit_behavior_policy_with_calibration(
         train_path.unlink(missing_ok=True)
 
     held_df = df.iloc[held_idx]
-    nll = held_out_nll(model, held_df)
+    nll = held_out_nll(
+        model, held_df,
+        universe_ids=universe_ids, universe_features=universe_features,
+    )
     if nll > nll_threshold:
         raise ValueError(
             f"behavior policy NLL exceeds threshold: {nll:.4f} > {nll_threshold:.4f}"

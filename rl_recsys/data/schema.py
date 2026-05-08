@@ -10,7 +10,7 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
     "rl_sessions": {"session_id", "step", "user_state", "slate", "item_features", "clicks"},
     "rl_sessions_b": {
         "session_id", "sequence_id", "user_state", "slate", "item_features",
-        "user_feedback", "candidate_ids", "candidate_features",
+        "user_feedback",
     },
     "slates": {"request_id", "user_id"},
     "social_edges": {"user_a", "user_b"},

@@ -54,8 +54,6 @@ def test_fit_behavior_policy_recovers_context_dependent_distribution(
             "slate": [0, 1, 2],
             "user_feedback": [1, 0, 0],
             "item_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
-            "candidate_ids": [0, 1, 2],
-            "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
         })
         # Context B: user_state = [0, 1]
         rows.append({
@@ -65,8 +63,6 @@ def test_fit_behavior_policy_recovers_context_dependent_distribution(
             "slate": [1, 0, 2],
             "user_feedback": [1, 0, 0],
             "item_features": [[1.0, 0.0], [0.0, 0.0], [0.5, 0.5]],
-            "candidate_ids": [0, 1, 2],
-            "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
         })
     df = pd.DataFrame(rows)
     parquet = tmp_path / "synth_b.parquet"
@@ -104,16 +100,19 @@ def test_held_out_nll_returns_average_neg_log_prob(tmp_path) -> None:
         return torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64)
     model._score_position = fake_score
 
+    # Pass universe explicitly — df no longer carries candidate_features/candidate_ids.
+    universe_ids = np.array([0, 1, 2], dtype=np.int64)
+    universe_features = np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]], dtype=np.float64)
     df = pd.DataFrame([
         {"user_state": [0.1, 0.2],
-         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
-         "candidate_ids": [0, 1, 2],
          "slate": [0]},  # target = position 0, item id 0
     ])
     e = float(np.e)
     expected = -np.log(e / (e + 2.0))  # softmax([1,0,0])[0]
 
-    result = held_out_nll(model, df)
+    result = held_out_nll(
+        model, df, universe_ids=universe_ids, universe_features=universe_features,
+    )
     assert result == pytest.approx(expected, rel=1e-6)
 
 
@@ -133,12 +132,11 @@ def test_fit_behavior_policy_with_calibration_raises_on_bad_nll(
         )
     monkeypatch.setattr(bp_module, "fit_behavior_policy", stub_fit)
 
+    _item_feats = {0: [0.0, 0.0], 1: [1.0, 0.0], 2: [0.5, 0.5]}
     rows = [
         {"session_id": i, "sequence_id": 1, "user_state": [1.0, 0.0],
          "slate": [(i % 3)], "user_feedback": [1],
-         "item_features": [[0.0, 0.0]],
-         "candidate_ids": [0, 1, 2],
-         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]]}
+         "item_features": [_item_feats[i % 3]]}
         for i in range(50)
     ]
     df = pd.DataFrame(rows)

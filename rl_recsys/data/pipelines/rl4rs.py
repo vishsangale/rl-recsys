@@ -93,26 +93,11 @@ class RL4RSPipeline(BasePipeline):
             ]
         )
 
-        universe_set: set[int] = set()
-        for slate in df["slate"]:
-            universe_set.update(slate)
-        universe = sorted(universe_set)
-        # Build a parallel feature lookup: pick each item's first observed feature vector.
-        feature_for: dict[int, list[float]] = {}
-        for slate, item_feats in zip(df["slate"], df["item_features"]):
-            for item_id, feat in zip(slate, item_feats):
-                if item_id not in feature_for:
-                    feature_for[item_id] = list(feat)
-        candidate_features = [feature_for[i] for i in universe]
-        df["candidate_ids"] = [list(universe)] * len(df)
-        df["candidate_features"] = [list(candidate_features)] * len(df)
-
         df = df.sort_values(["session_id", "sequence_id"], kind="stable")
         out_df = df[
             [
                 "session_id", "sequence_id", "user_state", "slate",
                 "item_features", "user_feedback",
-                "candidate_ids", "candidate_features",
             ]
         ].reset_index(drop=True)
         self.processed_dir.mkdir(parents=True, exist_ok=True)

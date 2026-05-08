@@ -32,13 +32,18 @@ def main() -> None:
     # Auto-detect shapes from the parquet — avoids hardcoding numbers that
     # would drift if RL4RSPipeline emits different dims later.
     import pandas as pd
-    df = pd.read_parquet(
-        parquet, columns=["user_state", "item_features", "slate", "candidate_ids"]
-    )
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    df = pd.read_parquet(parquet, columns=["user_state", "item_features", "slate"])
     USER_DIM = len(df["user_state"].iloc[0])
     ITEM_DIM = len(df["item_features"].iloc[0][0])
     SLATE_SIZE = len(df["slate"].iloc[0])
-    num_items = len(df["candidate_ids"].iloc[0])
+
+    # Derive num_items from the unique items seen across all logged slates.
+    slate_table = pq.read_table(parquet, columns=["slate"])
+    flat_items = slate_table["slate"].combine_chunks().flatten()
+    num_items = int(pc.count_distinct(flat_items).as_py())
     print(
         f"detected dims: user={USER_DIM}, item={ITEM_DIM}, "
         f"slate={SLATE_SIZE}, num_items={num_items}"

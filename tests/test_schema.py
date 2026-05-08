@@ -34,11 +34,6 @@ def _write_b_fixture(path: Path, *, missing: str | None = None) -> None:
         "slate": [[10, 11], [12, 13]],
         "item_features": [[[0.0], [1.0]], [[0.5], [0.7]]],
         "user_feedback": [[1, 0], [0, 1]],
-        "candidate_ids": [[10, 11, 12, 13], [10, 11, 12, 13]],
-        "candidate_features": [
-            [[0.0], [1.0], [0.5], [0.7]],
-            [[0.0], [1.0], [0.5], [0.7]],
-        ],
     }
     if missing:
         del columns[missing]
@@ -51,10 +46,10 @@ def test_validate_parquet_schema_accepts_rl_sessions_b(tmp_path: Path) -> None:
     validate_parquet_schema(p, "rl_sessions_b")  # must not raise
 
 
-def test_validate_parquet_schema_rejects_rl_sessions_b_missing_candidate_ids(
+def test_validate_parquet_schema_rejects_rl_sessions_b_missing_user_feedback(
     tmp_path: Path,
 ) -> None:
     p = tmp_path / "sessions_b.parquet"
-    _write_b_fixture(p, missing="candidate_ids")
-    with pytest.raises(ValueError, match="candidate_ids"):
+    _write_b_fixture(p, missing="user_feedback")
+    with pytest.raises(ValueError, match="user_feedback"):
         validate_parquet_schema(p, "rl_sessions_b")
