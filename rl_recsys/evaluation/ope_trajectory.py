@@ -45,7 +45,7 @@ def seq_dr_value(
 @dataclass(frozen=True)
 class LoggedTrajectoryStep:
     obs: RecObs
-    logged_action: np.ndarray  # shape (slate_size,) — the logged slate, item ids
+    logged_action: np.ndarray  # shape (slate_size,) — candidate indices (positions in obs.candidate_ids)
     logged_reward: float
     propensity: float          # μ(slate | obs) = Π_k μ(slate[k] | obs, k)
 

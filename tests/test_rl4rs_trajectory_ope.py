@@ -55,9 +55,9 @@ def test_loader_emits_trajectories_grouped_by_session(tmp_path: Path) -> None:
     assert all(isinstance(s, LoggedTrajectoryStep) for s in s1)
     # logged_action shape == (slate_size,)
     assert s1[0].logged_action.shape == (2,)
-    np.testing.assert_array_equal(s1[0].logged_action, np.array([10, 11]))
-    np.testing.assert_array_equal(s1[1].logged_action, np.array([11, 12]))
-    np.testing.assert_array_equal(s2[0].logged_action, np.array([10, 12]))
+    np.testing.assert_array_equal(s1[0].logged_action, np.array([0, 1]))
+    np.testing.assert_array_equal(s1[1].logged_action, np.array([1, 2]))
+    np.testing.assert_array_equal(s2[0].logged_action, np.array([0, 2]))
     # rewards = sum(user_feedback)
     assert s1[0].logged_reward == 1.0
     assert s1[1].logged_reward == 1.0

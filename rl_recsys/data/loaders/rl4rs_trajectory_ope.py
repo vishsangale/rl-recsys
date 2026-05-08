@@ -80,7 +80,7 @@ class RL4RSTrajectoryOPESource:
                 steps.append(
                     LoggedTrajectoryStep(
                         obs=obs,
-                        logged_action=logged_slate_ids,
+                        logged_action=slate_indices,
                         logged_reward=logged_reward,
                         propensity=propensity,
                     )
