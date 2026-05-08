@@ -309,6 +309,36 @@ def test_target_probability_raises_on_nonpositive_temperature() -> None:
         )
 
 
+def test_evaluate_trajectory_ope_agent_reports_ess() -> None:
+    # _DetAgent flat scores → π = 0.25 per step at T=1, slate_size=1.
+    # propensity=0.5 → w=0.5 (clipped within [0.1,10]). With 4 such steps,
+    # W per step is cumprod within trajectory. Per-trajectory ESS contribution
+    # is computed by the implementation; we just verify ess is finite, in
+    # (0, total_steps], and equals (sum W)^2 / sum W^2 across all step weights.
+    obs = _make_obs(num_candidates=4)
+    traj = [
+        LoggedTrajectoryStep(
+            obs=obs, logged_action=np.array([0], dtype=np.int64),
+            logged_reward=1.0, propensity=0.5,
+        )
+        for _ in range(4)
+    ]
+    source = _SyntheticTrajectorySource(trajectories=[traj])
+    agent = _DetAgent(slate_size=1)
+
+    result = evaluate_trajectory_ope_agent(
+        source, agent, agent_name="det",
+        max_trajectories=1, seed=0, gamma=0.9, temperature=1.0,
+    )
+
+    # W within trajectory = cumprod([0.5,0.5,0.5,0.5]) = [0.5, 0.25, 0.125, 0.0625]
+    expected_ess = (0.5 + 0.25 + 0.125 + 0.0625) ** 2 / (
+        0.5**2 + 0.25**2 + 0.125**2 + 0.0625**2
+    )
+    assert result.ess == pytest.approx(expected_ess)
+    assert 0.0 < result.ess <= result.total_steps
+
+
 def test_evaluate_trajectory_ope_agent_raises_when_agent_lacks_score_items() -> None:
     class _NoScoresAgent:
         def select_slate(self, obs):

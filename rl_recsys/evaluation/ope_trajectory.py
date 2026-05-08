@@ -64,6 +64,7 @@ class TrajectoryOPEEvaluation:
     total_steps: int = field(metadata={"aggregate": False})
     avg_seq_dr_value: float
     avg_logged_discounted_return: float
+    ess: float = field(metadata={"aggregate": False})
     seconds: float = field(metadata={"aggregate": False})
 
     def as_dict(self) -> dict[str, float | int | str]:
@@ -73,6 +74,7 @@ class TrajectoryOPEEvaluation:
             "total_steps": self.total_steps,
             "avg_seq_dr_value": self.avg_seq_dr_value,
             "avg_logged_discounted_return": self.avg_logged_discounted_return,
+            "ess": self.ess,
             "seconds": self.seconds,
         }
 
@@ -137,6 +139,7 @@ def evaluate_trajectory_ope_agent(
     seq_dr_per_traj: list[float] = []
     logged_returns: list[float] = []
     total_steps = 0
+    all_weights: list[np.ndarray] = []
 
     for traj in source.iter_trajectories(max_trajectories=max_trajectories, seed=seed):
         if not traj:
@@ -161,6 +164,9 @@ def evaluate_trajectory_ope_agent(
         rewards_arr = np.asarray(rewards, dtype=np.float64)
         target_arr = np.asarray(target_probs, dtype=np.float64)
         prop_arr = np.asarray(propensities, dtype=np.float64)
+        ratios = np.clip(target_arr / prop_arr, clip[0], clip[1])
+        cum_weights = np.cumprod(ratios)
+        all_weights.append(cum_weights)
         seq_dr_per_traj.append(
             seq_dr_value(
                 rewards_arr, target_arr, prop_arr,
@@ -174,11 +180,22 @@ def evaluate_trajectory_ope_agent(
     if n == 0:
         raise ValueError("source produced zero trajectories")
 
+    weights = np.concatenate(all_weights)
+    ess = float((weights.sum() ** 2) / (np.sum(weights ** 2)))
+    if ess / total_steps < 0.01:
+        import warnings
+        warnings.warn(
+            f"effective sample size {ess:.2f} is < 1% of total steps "
+            f"({total_steps}); estimator may be unreliable",
+            stacklevel=2,
+        )
+
     return TrajectoryOPEEvaluation(
         agent=agent_name,
         trajectories=n,
         total_steps=total_steps,
         avg_seq_dr_value=float(np.mean(seq_dr_per_traj)),
         avg_logged_discounted_return=float(np.mean(logged_returns)),
+        ess=ess,
         seconds=float(perf_counter() - started),
     )
