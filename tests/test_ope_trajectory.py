@@ -284,7 +284,6 @@ def test_target_probability_boltzmann_factorized_over_slate() -> None:
 
     result = _target_probability(
         agent, obs,
-        agent_slate=np.array([0, 1], dtype=np.int64),
         logged_slate=np.array([0, 1], dtype=np.int64),
         temperature=1.0,
     )
@@ -303,7 +302,6 @@ def test_target_probability_raises_on_nonpositive_temperature() -> None:
     with pytest.raises(ValueError, match="temperature"):
         _target_probability(
             _ScoredAgent(), obs,
-            agent_slate=np.array([0], dtype=np.int64),
             logged_slate=np.array([0], dtype=np.int64),
             temperature=0.0,
         )

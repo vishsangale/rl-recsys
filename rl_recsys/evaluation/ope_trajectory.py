@@ -82,7 +82,6 @@ class TrajectoryOPEEvaluation:
 def _target_probability(
     agent: Agent,
     obs: RecObs,
-    agent_slate: np.ndarray,
     logged_slate: np.ndarray,
     *,
     temperature: float,
@@ -148,13 +147,9 @@ def evaluate_trajectory_ope_agent(
         target_probs: list[float] = []
         propensities: list[float] = []
         for step in traj:
-            agent_slate = np.asarray(agent.select_slate(step.obs), dtype=np.int64)
-            if len(agent_slate) == 0:
-                raise ValueError("agent returned an empty slate")
             target_probs.append(
                 _target_probability(
                     agent, step.obs,
-                    agent_slate=agent_slate,
                     logged_slate=np.asarray(step.logged_action, dtype=np.int64),
                     temperature=temperature,
                 )

@@ -135,3 +135,12 @@ register(
     raw_dir="data/raw/rl4rs",
     processed_dir="data/processed/rl4rs",
 )
+
+register(
+    "rl4rs_b",
+    RL4RSPipeline,
+    schema="rl_sessions_b",
+    tags=["RL/Slate", "Multi-step"],
+    raw_dir="data/raw/rl4rs",
+    processed_dir="data/processed/rl4rs",
+)

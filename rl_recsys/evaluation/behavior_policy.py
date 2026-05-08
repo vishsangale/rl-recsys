@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
 
 
 class BehaviorPolicy(nn.Module):
@@ -238,5 +241,5 @@ def fit_behavior_policy_with_calibration(
         raise ValueError(
             f"behavior policy NLL exceeds threshold: {nll:.4f} > {nll_threshold:.4f}"
         )
-    print(f"Behavior policy held-out NLL = {nll:.4f} (threshold {nll_threshold:.4f})")
+    logger.info("Behavior policy held-out NLL = %.4f (threshold %.4f)", nll, nll_threshold)
     return model
