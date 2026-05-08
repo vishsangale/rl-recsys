@@ -21,6 +21,10 @@ class RandomAgent(Agent):
             )
         return self._rng.choice(n, size=self._slate_size, replace=False)
 
+    def score_items(self, obs: RecObs) -> np.ndarray:
+        """Uniform scores → softmax produces uniform 1/n distribution."""
+        return np.zeros(len(obs.candidate_features), dtype=np.float64)
+
     def update(
         self,
         obs: RecObs,

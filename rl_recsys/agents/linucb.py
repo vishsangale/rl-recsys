@@ -31,7 +31,7 @@ class LinUCBAgent(Agent):
             raise ValueError(
                 f"slate_size={self._slate_size} exceeds num_candidates={n}"
             )
-        scores = self.score_candidates(obs)
+        scores = self.score_items(obs)
         return np.argsort(scores)[-self._slate_size :][::-1]
 
     def update(
@@ -58,8 +58,8 @@ class LinUCBAgent(Agent):
             "agent_click_mean": float(clicks.mean()) if len(clicks) else 0.0,
         }
 
-    def score_candidates(self, obs: RecObs) -> np.ndarray:
-        """Return LinUCB scores for every candidate in the observation."""
+    def score_items(self, obs: RecObs) -> np.ndarray:
+        """Return LinUCB UCB scores for every candidate in the observation."""
         features = self._candidate_features(obs)
         theta = np.linalg.solve(self._a_matrix, self._b_vector)
         mean_scores = features @ theta

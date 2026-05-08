@@ -25,6 +25,14 @@ def _obs() -> RecObs:
     )
 
 
+def test_random_agent_score_items_is_uniform() -> None:
+    agent = RandomAgent(slate_size=2)
+    scores = agent.score_items(_obs())
+
+    assert scores.shape == (3,)
+    assert np.allclose(scores, scores[0])  # all equal → uniform softmax
+
+
 def test_random_agent_selects_unique_slate() -> None:
     agent = RandomAgent(slate_size=2)
     slate = agent.select_slate(_obs())
@@ -65,7 +73,7 @@ def test_linucb_positive_feedback_improves_clicked_candidate_score() -> None:
     agent = LinUCBAgent(slate_size=1, user_dim=2, item_dim=2, alpha=0.0)
     obs = _obs()
 
-    before_scores = agent.score_candidates(obs)
+    before_scores = agent.score_items(obs)
     for _ in range(5):
         agent.update(
             obs,
@@ -74,7 +82,7 @@ def test_linucb_positive_feedback_improves_clicked_candidate_score() -> None:
             clicks=np.array([1.0]),
             next_obs=obs,
         )
-    after_scores = agent.score_candidates(obs)
+    after_scores = agent.score_items(obs)
 
     assert after_scores[0] > before_scores[0]
     assert after_scores[0] > after_scores[1]
