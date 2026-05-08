@@ -12,7 +12,7 @@ def test_slate_propensity_returns_product_of_position_softmax() -> None:
     # the softmax probabilities are hand-computable.
     model = BehaviorPolicy(
         user_dim=2, item_dim=2, slate_size=2, num_items=3,
-        hidden_dim=4, seed=0,
+        hidden_dim=4, seed=0, device="cpu",
     )
 
     def fake_score(user_feat, candidate_feats, position):
@@ -94,7 +94,7 @@ def test_held_out_nll_returns_average_neg_log_prob(tmp_path) -> None:
     # Build a model with a deterministic scorer for which NLL is hand-computable.
     model = BehaviorPolicy(
         user_dim=2, item_dim=2, slate_size=1, num_items=3,
-        hidden_dim=4, seed=0,
+        hidden_dim=4, seed=0, device="cpu",
     )
     # Patch _score_batch (used by the vectorized held_out_nll) to return
     # known logits: shape (B, 3) with [1, 0, 0] for every sample.

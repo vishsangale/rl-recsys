@@ -26,6 +26,7 @@ class BehaviorPolicy(nn.Module):
         num_items: int,
         hidden_dim: int = 64,
         seed: int = 0,
+        device=None,
     ) -> None:
         super().__init__()
         torch.manual_seed(seed)
@@ -33,13 +34,16 @@ class BehaviorPolicy(nn.Module):
         self._item_dim = item_dim
         self._slate_size = slate_size
         self._num_items = num_items
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._device = torch.device(device)
         self._mlp = nn.Sequential(
             nn.Linear(user_dim + item_dim + slate_size, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
-        ).double()
+        ).double().to(self._device)
 
     def _score_position(
         self,
@@ -48,8 +52,10 @@ class BehaviorPolicy(nn.Module):
         position: int,
     ) -> torch.Tensor:
         """Returns logits of shape (num_candidates,) for the given position."""
+        user_feat = user_feat.to(self._device)
+        candidate_feats = candidate_feats.to(self._device)
         n = candidate_feats.shape[0]
-        position_onehot = torch.zeros(self._slate_size, dtype=torch.float64)
+        position_onehot = torch.zeros(self._slate_size, dtype=torch.float64, device=self._device)
         position_onehot[position] = 1.0
         user_tile = user_feat.unsqueeze(0).expand(n, -1)
         position_tile = position_onehot.unsqueeze(0).expand(n, -1)
@@ -63,9 +69,12 @@ class BehaviorPolicy(nn.Module):
         positions: torch.Tensor,    # (B,), long
     ) -> torch.Tensor:
         """Batched forward. Returns logits of shape (B, num_candidates)."""
+        users = users.to(self._device)
+        cands = cands.to(self._device)
+        positions = positions.to(self._device)
         b, n, _ = cands.shape
         user_tile = users.unsqueeze(1).expand(b, n, -1)
-        pos_onehot = torch.zeros(b, self._slate_size, dtype=torch.float64)
+        pos_onehot = torch.zeros(b, self._slate_size, dtype=torch.float64, device=self._device)
         pos_onehot.scatter_(1, positions.unsqueeze(1), 1.0)
         pos_tile = pos_onehot.unsqueeze(1).expand(b, n, -1)
         x = torch.cat([user_tile, cands, pos_tile], dim=2)
@@ -78,8 +87,8 @@ class BehaviorPolicy(nn.Module):
         slate: np.ndarray,
     ) -> float:
         """π_b(slate | context) = Π_k softmax(score(·, k))[slate[k]]."""
-        user = torch.as_tensor(user_features, dtype=torch.float64)
-        cand = torch.as_tensor(candidate_features, dtype=torch.float64)
+        user = torch.as_tensor(user_features, dtype=torch.float64, device=self._device)
+        cand = torch.as_tensor(candidate_features, dtype=torch.float64, device=self._device)
         slate_t = torch.as_tensor(np.asarray(slate, dtype=np.int64))
         log_prob_total = 0.0
         with torch.no_grad():
@@ -137,6 +146,7 @@ def fit_behavior_policy(
     learning_rate: float = 1e-2,
     seed: int = 0,
     hidden_dim: int = 64,
+    device=None,
 ) -> BehaviorPolicy:
     """Fit a per-position softmax classifier on logged slate placements.
 
@@ -153,9 +163,15 @@ def fit_behavior_policy(
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
 
+    model = BehaviorPolicy(
+        user_dim=user_dim, item_dim=item_dim, slate_size=slate_size,
+        num_items=num_items, hidden_dim=hidden_dim, seed=seed, device=device,
+    )
+    logger.info("BehaviorPolicy training on device=%s", model._device)
+
     # Build candidate universe once from slate+item_features.
     universe_ids, universe_features, id_to_idx = _build_universe_from_df(df)
-    cand_t_shared = torch.as_tensor(universe_features, dtype=torch.float64)
+    cand_t_shared = torch.as_tensor(universe_features, dtype=torch.float64, device=model._device)
 
     # Build training tensors. Every row contributes slate_size examples.
     users: list[np.ndarray] = []
@@ -176,14 +192,10 @@ def fit_behavior_policy(
     if not users:
         raise ValueError("no training tuples derivable from parquet")
 
-    user_t = torch.as_tensor(np.stack(users), dtype=torch.float64)
-    pos_t = torch.as_tensor(np.array(positions), dtype=torch.long)
-    target_t = torch.as_tensor(np.array(targets), dtype=torch.long)
+    user_t = torch.as_tensor(np.stack(users), dtype=torch.float64, device=model._device)
+    pos_t = torch.as_tensor(np.array(positions), dtype=torch.long, device=model._device)
+    target_t = torch.as_tensor(np.array(targets), dtype=torch.long, device=model._device)
 
-    model = BehaviorPolicy(
-        user_dim=user_dim, item_dim=item_dim, slate_size=slate_size,
-        num_items=num_items, hidden_dim=hidden_dim, seed=seed,
-    )
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     n = user_t.shape[0]
@@ -193,7 +205,7 @@ def fit_behavior_policy(
         n_batches = 0
         for start in range(0, n, batch_size):
             batch_idx = order[start : start + batch_size]
-            bi_t = torch.as_tensor(batch_idx, dtype=torch.long)
+            bi_t = torch.as_tensor(batch_idx, dtype=torch.long, device=model._device)
             b = bi_t.shape[0]
             # Expand shared candidate universe as a zero-copy view per sample.
             cands_b = cand_t_shared.unsqueeze(0).expand(b, -1, -1)
@@ -240,7 +252,7 @@ def held_out_nll(
     else:
         id_to_idx = {int(cid): k for k, cid in enumerate(universe_ids)}
 
-    cand_t_shared = torch.as_tensor(universe_features, dtype=torch.float64)
+    cand_t_shared = torch.as_tensor(universe_features, dtype=torch.float64, device=model._device)
 
     # Build all (user, position, target) tuples up front.
     users: list[np.ndarray] = []
@@ -261,9 +273,9 @@ def held_out_nll(
     if not users:
         raise ValueError("no held-out tuples; cannot compute NLL")
 
-    user_t = torch.as_tensor(np.stack(users), dtype=torch.float64)
-    pos_t = torch.as_tensor(np.array(positions), dtype=torch.long)
-    target_t = torch.as_tensor(np.array(targets), dtype=torch.long)
+    user_t = torch.as_tensor(np.stack(users), dtype=torch.float64, device=model._device)
+    pos_t = torch.as_tensor(np.array(positions), dtype=torch.long, device=model._device)
+    target_t = torch.as_tensor(np.array(targets), dtype=torch.long, device=model._device)
 
     n = user_t.shape[0]
     total_nll = 0.0
@@ -297,6 +309,7 @@ def fit_behavior_policy_with_calibration(
     hidden_dim: int = 64,
     nll_threshold: float | None = None,
     held_out_fraction: float = 0.1,
+    device=None,
 ) -> BehaviorPolicy:
     """Fit + held-out NLL gate.
 
@@ -328,6 +341,7 @@ def fit_behavior_policy_with_calibration(
             slate_size=slate_size, num_items=num_items,
             epochs=epochs, batch_size=batch_size,
             learning_rate=learning_rate, seed=seed, hidden_dim=hidden_dim,
+            device=device,
         )
     finally:
         train_path.unlink(missing_ok=True)
