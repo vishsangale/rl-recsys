@@ -89,3 +89,67 @@ def test_fit_behavior_policy_recovers_context_dependent_distribution(
     p_b_item0 = model.slate_propensity(user_b, cand, np.array([0], dtype=np.int64))
     p_b_item1 = model.slate_propensity(user_b, cand, np.array([1], dtype=np.int64))
     assert p_b_item1 > p_b_item0
+
+
+def test_held_out_nll_returns_average_neg_log_prob(tmp_path) -> None:
+    from rl_recsys.evaluation.behavior_policy import (
+        BehaviorPolicy, held_out_nll,
+    )
+    # Build a model with a deterministic scorer for which NLL is hand-computable.
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=1, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    def fake_score(user_feat, candidate_feats, position):
+        return torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64)
+    model._score_position = fake_score
+
+    df = pd.DataFrame([
+        {"user_state": [0.1, 0.2],
+         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]],
+         "candidate_ids": [0, 1, 2],
+         "slate": [0]},  # target = position 0, item id 0
+    ])
+    e = float(np.e)
+    expected = -np.log(e / (e + 2.0))  # softmax([1,0,0])[0]
+
+    result = held_out_nll(model, df)
+    assert result == pytest.approx(expected, rel=1e-6)
+
+
+def test_fit_behavior_policy_with_calibration_raises_on_bad_nll(
+    tmp_path, monkeypatch,
+) -> None:
+    from rl_recsys.evaluation import behavior_policy as bp_module
+
+    # Force fit_behavior_policy to return a degenerate model whose NLL on
+    # held-out exceeds 2*log(num_items). We monkey-patch fit_behavior_policy
+    # to a stub that returns a model with random weights only (no training).
+    def stub_fit(*args, **kwargs):
+        return bp_module.BehaviorPolicy(
+            user_dim=kwargs["user_dim"], item_dim=kwargs["item_dim"],
+            slate_size=kwargs["slate_size"], num_items=kwargs["num_items"],
+            hidden_dim=4, seed=0,
+        )
+    monkeypatch.setattr(bp_module, "fit_behavior_policy", stub_fit)
+
+    rows = [
+        {"session_id": i, "sequence_id": 1, "user_state": [1.0, 0.0],
+         "slate": [(i % 3)], "user_feedback": [1],
+         "item_features": [[0.0, 0.0]],
+         "candidate_ids": [0, 1, 2],
+         "candidate_features": [[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]]}
+        for i in range(50)
+    ]
+    df = pd.DataFrame(rows)
+    parquet = tmp_path / "noisy_b.parquet"
+    df.to_parquet(parquet, index=False)
+
+    # NLL threshold gate: with the stub returning an untrained model, NLL on
+    # noisy held-out should exceed 2*log(3) ≈ 2.197 only if the model is
+    # severely biased. To FORCE a fail, set threshold ratio to a tiny value.
+    with pytest.raises(ValueError, match="behavior policy NLL exceeds threshold"):
+        bp_module.fit_behavior_policy_with_calibration(
+            parquet, user_dim=2, item_dim=2, slate_size=1, num_items=3,
+            epochs=1, batch_size=8, seed=0, nll_threshold=0.01,
+        )

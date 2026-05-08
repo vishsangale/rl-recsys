@@ -152,3 +152,91 @@ def fit_behavior_policy(
             optimizer.step()
 
     return model
+
+
+def held_out_nll(model: BehaviorPolicy, df) -> float:
+    """Average negative log-likelihood over (row, slate-position) tuples.
+
+    `df` rows must include `user_state`, `candidate_features`, `candidate_ids`,
+    `slate`. Returns mean -log p(slate[k] | context, k) across all positions.
+    """
+    losses: list[float] = []
+    with torch.no_grad():
+        for _, row in df.iterrows():
+            user = torch.as_tensor(
+                np.array(list(row["user_state"]), dtype=np.float64),
+                dtype=torch.float64,
+            )
+            cand = torch.as_tensor(
+                np.array(list(row["candidate_features"]), dtype=np.float64),
+                dtype=torch.float64,
+            )
+            cand_ids = list(row["candidate_ids"])
+            slate = list(row["slate"])
+            for k in range(len(slate)):
+                target_item_id = int(slate[k])
+                try:
+                    target_idx = cand_ids.index(target_item_id)
+                except ValueError:
+                    continue
+                logits = model._score_position(user, cand, k)
+                log_probs = torch.log_softmax(logits, dim=-1)
+                losses.append(-float(log_probs[target_idx].item()))
+    if not losses:
+        raise ValueError("no held-out tuples; cannot compute NLL")
+    return float(np.mean(losses))
+
+
+def fit_behavior_policy_with_calibration(
+    parquet_path: Path,
+    *,
+    user_dim: int,
+    item_dim: int,
+    slate_size: int,
+    num_items: int,
+    epochs: int = 20,
+    batch_size: int = 256,
+    learning_rate: float = 1e-2,
+    seed: int = 0,
+    hidden_dim: int = 64,
+    nll_threshold: float | None = None,
+    held_out_fraction: float = 0.1,
+) -> BehaviorPolicy:
+    """Fit + held-out NLL gate.
+
+    Splits parquet 90/10 (deterministic via seed), fits on the 90, evaluates
+    NLL on the 10, and raises if NLL > nll_threshold.
+    Default threshold = 2 * log(num_items)  (twice uniform NLL).
+    """
+    import pandas as pd
+
+    if nll_threshold is None:
+        nll_threshold = 2.0 * float(np.log(num_items))
+
+    df = pd.read_parquet(parquet_path)
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(len(df))
+    n_held = max(1, int(len(df) * held_out_fraction))
+    held_idx = perm[:n_held]
+    train_idx = perm[n_held:]
+
+    train_path = parquet_path.with_name(parquet_path.stem + "_train.parquet")
+    df.iloc[train_idx].to_parquet(train_path, index=False)
+    try:
+        model = fit_behavior_policy(
+            train_path, user_dim=user_dim, item_dim=item_dim,
+            slate_size=slate_size, num_items=num_items,
+            epochs=epochs, batch_size=batch_size,
+            learning_rate=learning_rate, seed=seed, hidden_dim=hidden_dim,
+        )
+    finally:
+        train_path.unlink(missing_ok=True)
+
+    held_df = df.iloc[held_idx]
+    nll = held_out_nll(model, held_df)
+    if nll > nll_threshold:
+        raise ValueError(
+            f"behavior policy NLL exceeds threshold: {nll:.4f} > {nll_threshold:.4f}"
+        )
+    print(f"Behavior policy held-out NLL = {nll:.4f} (threshold {nll_threshold:.4f})")
+    return model
