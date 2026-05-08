@@ -96,9 +96,12 @@ def test_held_out_nll_returns_average_neg_log_prob(tmp_path) -> None:
         user_dim=2, item_dim=2, slate_size=1, num_items=3,
         hidden_dim=4, seed=0,
     )
-    def fake_score(user_feat, candidate_feats, position):
-        return torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64)
-    model._score_position = fake_score
+    # Patch _score_batch (used by the vectorized held_out_nll) to return
+    # known logits: shape (B, 3) with [1, 0, 0] for every sample.
+    def fake_score_batch(users, cands, positions):
+        b = users.shape[0]
+        return torch.tensor([[1.0, 0.0, 0.0]] * b, dtype=torch.float64)
+    model._score_batch = fake_score_batch
 
     # Pass universe explicitly — df no longer carries candidate_features/candidate_ids.
     universe_ids = np.array([0, 1, 2], dtype=np.int64)
