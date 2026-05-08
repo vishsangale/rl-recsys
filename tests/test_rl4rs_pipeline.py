@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-import pyarrow.parquet as pq
 import pytest
 
 from rl_recsys.data.pipelines.rl4rs import RL4RSPipeline
