@@ -106,3 +106,31 @@ def test_topk_reinforce_train_offline_runs():
     )
     metrics = agent.train_offline(_StubSource(), seed=0)
     assert "loss" in metrics
+
+
+def test_decision_transformer_score_shape():
+    from rl_recsys.agents.decision_transformer import DecisionTransformerAgent
+
+    agent = DecisionTransformerAgent(
+        slate_size=3, num_candidates=8, user_dim=4, item_dim=3,
+        hidden_dim=8, n_blocks=1, context_window=5,
+        target_return=1.0, gamma=0.95, epochs=1, device="cpu",
+    )
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.eye(8, 3),
+        candidate_ids=np.arange(8, dtype=np.int64),
+    )
+    assert agent.score_items(obs).shape == (8,)
+
+
+def test_decision_transformer_train_offline_runs():
+    from rl_recsys.agents.decision_transformer import DecisionTransformerAgent
+
+    agent = DecisionTransformerAgent(
+        slate_size=3, num_candidates=8, user_dim=4, item_dim=3,
+        hidden_dim=8, n_blocks=1, context_window=5,
+        target_return=1.0, gamma=0.95, epochs=1, device="cpu",
+    )
+    metrics = agent.train_offline(_StubSource(), seed=0)
+    assert "loss" in metrics

@@ -9,6 +9,7 @@ import torch
 from rl_recsys.agents.base import Agent
 from rl_recsys.agents.bc import BCAgent
 from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
+from rl_recsys.agents.decision_transformer import DecisionTransformerAgent
 from rl_recsys.agents.gbdt import GBDTAgent
 from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
 from rl_recsys.agents.lin_ts import LinTSAgent
@@ -150,9 +151,26 @@ def _build_topk_reinforce(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_decision_transformer(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return DecisionTransformerAgent(
+        slate_size=env_cfg.slate_size,
+        num_candidates=env_cfg.num_candidates,
+        user_dim=env_cfg.user_dim,
+        item_dim=env_cfg.item_dim,
+        hidden_dim=getattr(agent_cfg, "hidden_dim", 64),
+        n_blocks=getattr(agent_cfg, "n_blocks", 3),
+        context_window=getattr(agent_cfg, "context_window", 20),
+        target_return=getattr(agent_cfg, "target_return", 10.0),
+        gamma=getattr(agent_cfg, "gamma", 0.95),
+        epochs=getattr(agent_cfg, "epochs", 10),
+        device=_safe_device(agent_cfg),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "bc": _build_bc,
     "boltzmann_linear": _build_boltzmann_linear,
+    "decision_transformer": _build_decision_transformer,
     "gbdt": _build_gbdt,
     "eps_greedy_linear": _build_eps_greedy_linear,
     "lin_ts": _build_lin_ts,
