@@ -275,3 +275,64 @@ def test_loader_propensity_matches_per_call(tmp_path: Path) -> None:
                 step.logged_action,
             )
             assert step.propensity == pytest.approx(expected, rel=1e-12, abs=1e-12)
+
+
+def test_loader_history_accumulates_within_session(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    trajectories = list(source.iter_trajectories(max_trajectories=10, seed=0))
+    s1 = next(t for t in trajectories if len(t) == 2)
+    assert len(s1[0].obs.history) == 0
+    assert len(s1[1].obs.history) == 1
+
+
+def test_loader_history_resets_between_sessions(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    trajs = list(source.iter_trajectories(max_trajectories=10, seed=0))
+    # Both sessions start with empty history at step 0.
+    for traj in trajs:
+        assert len(traj[0].obs.history) == 0
+
+
+def test_loader_obs_logged_action_matches_step_logged_action(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    trajs = list(source.iter_trajectories(max_trajectories=10, seed=0))
+    for traj in trajs:
+        for step in traj:
+            assert step.obs.logged_action is not None
+            assert step.obs.logged_clicks is not None
+            np.testing.assert_array_equal(
+                step.obs.logged_action, step.logged_action,
+            )
+            np.testing.assert_array_equal(
+                step.obs.logged_clicks, step.logged_clicks,
+            )

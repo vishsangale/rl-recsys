@@ -9,7 +9,7 @@ import pandas as pd
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from rl_recsys.environments.base import RecObs
+from rl_recsys.environments.base import HistoryStep, RecObs
 from rl_recsys.evaluation.behavior_policy import BehaviorPolicy
 from rl_recsys.evaluation.ope_trajectory import LoggedTrajectoryStep
 
@@ -130,6 +130,7 @@ class RL4RSTrajectoryOPESource:
             if max_trajectories is not None and emitted >= max_trajectories:
                 break
             group = groups.get_group(sid)
+            history: list[HistoryStep] = []
             steps: list[LoggedTrajectoryStep] = []
             for row_pos, row in zip(group.index, group.itertuples(index=False)):
                 user_features = np.array(list(row.user_state), dtype=np.float64)
@@ -149,6 +150,9 @@ class RL4RSTrajectoryOPESource:
                     user_features=user_features,
                     candidate_features=self._candidate_features,
                     candidate_ids=self._candidate_ids,
+                    history=tuple(history),
+                    logged_action=slate_indices,
+                    logged_clicks=logged_clicks,
                 )
                 steps.append(
                     LoggedTrajectoryStep(
@@ -158,6 +162,9 @@ class RL4RSTrajectoryOPESource:
                         logged_clicks=logged_clicks,
                         propensity=propensity,
                     )
+                )
+                history.append(
+                    HistoryStep(slate=slate_indices, clicks=logged_clicks)
                 )
             yield steps
             emitted += 1
