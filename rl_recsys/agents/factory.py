@@ -5,6 +5,7 @@ from typing import Callable
 
 from rl_recsys.agents.base import Agent
 from rl_recsys.agents.linucb import LinUCBAgent
+from rl_recsys.agents.most_popular import MostPopularAgent
 from rl_recsys.agents.random import RandomAgent
 from rl_recsys.config import AgentConfig, EnvConfig
 
@@ -24,9 +25,17 @@ def _build_linucb(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_most_popular(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return MostPopularAgent(
+        slate_size=env_cfg.slate_size,
+        num_candidates=env_cfg.num_candidates,
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "random": _build_random,
     "linucb": _build_linucb,
+    "most_popular": _build_most_popular,
 }
 
 
