@@ -7,6 +7,7 @@ from rl_recsys.agents.base import Agent
 from rl_recsys.agents.linucb import LinUCBAgent
 from rl_recsys.agents.logged_replay import LoggedReplayAgent
 from rl_recsys.agents.most_popular import MostPopularAgent
+from rl_recsys.agents.oracle_click import OracleClickAgent
 from rl_recsys.agents.random import RandomAgent
 from rl_recsys.config import AgentConfig, EnvConfig
 
@@ -37,11 +38,16 @@ def _build_logged_replay(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     return LoggedReplayAgent(slate_size=env_cfg.slate_size)
 
 
+def _build_oracle_click(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return OracleClickAgent(slate_size=env_cfg.slate_size)
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "random": _build_random,
     "linucb": _build_linucb,
     "logged_replay": _build_logged_replay,
     "most_popular": _build_most_popular,
+    "oracle_click": _build_oracle_click,
 }
 
 

@@ -99,3 +99,49 @@ def test_logged_replay_score_items_peaks_on_logged_slate():
     scores = agent.score_items(obs)
     assert scores.shape == (6,)
     assert scores[2] > scores[0] and scores[4] > scores[0]
+
+
+def test_oracle_click_picks_clicked_items_first():
+    from rl_recsys.agents.oracle_click import OracleClickAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+        logged_action=np.array([2, 5, 7, 9], dtype=np.int64),
+        logged_clicks=np.array([0, 1, 1, 0], dtype=np.int64),
+    )
+    agent = OracleClickAgent(slate_size=2)
+    slate = agent.select_slate(obs)
+    assert set(slate.tolist()) == {5, 7}
+
+
+def test_oracle_click_pads_when_underclicked():
+    from rl_recsys.agents.oracle_click import OracleClickAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+        logged_action=np.array([2, 5, 7], dtype=np.int64),
+        logged_clicks=np.array([0, 1, 0], dtype=np.int64),
+    )
+    agent = OracleClickAgent(slate_size=3)
+    slate = agent.select_slate(obs)
+    assert slate.shape == (3,)
+    assert 5 in slate.tolist()  # clicked item must be present
+    assert len(set(slate.tolist())) == 3  # all unique
+
+
+def test_oracle_click_raises_without_logged_clicks():
+    from rl_recsys.agents.oracle_click import OracleClickAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+        logged_action=np.array([0, 1], dtype=np.int64),
+    )
+    agent = OracleClickAgent(slate_size=2)
+    with pytest.raises(ValueError, match="logged_clicks"):
+        agent.select_slate(obs)
