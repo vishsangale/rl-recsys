@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
+
+
+@dataclass
+class HistoryStep:
+    """One past step within the current session.
+
+    Used by sequence-aware agents (SASRec, TopK REINFORCE, Decision
+    Transformer). Populated by trajectory loaders; outside replay
+    contexts the consumer constructs an empty tuple.
+    """
+
+    slate: np.ndarray   # (slate_size,) candidate indices into RecObs.candidate_*
+    clicks: np.ndarray  # (slate_size,) 0/1
 
 
 @dataclass
@@ -13,6 +26,10 @@ class RecObs:
     user_features: np.ndarray  # (user_dim,)
     candidate_features: np.ndarray  # (num_candidates, item_dim)
     candidate_ids: np.ndarray  # (num_candidates,)
+    history: tuple[HistoryStep, ...] = field(default_factory=tuple)
+    # Replay-mode-only fields. None outside replay sources.
+    logged_action: np.ndarray | None = None
+    logged_clicks: np.ndarray | None = None
 
 
 @dataclass
