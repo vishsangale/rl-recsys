@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from typing import Callable
 
+import numpy as np
 import torch
 
 from rl_recsys.agents.base import Agent
+from rl_recsys.agents.bc import BCAgent
 from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
 from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
 from rl_recsys.agents.lin_ts import LinTSAgent
@@ -97,7 +99,17 @@ def _build_neural_linear(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_bc(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    # candidate_features and behavior_policy are injected by the runner
+    # (Task 20) before train_offline. The factory constructs a stub.
+    return BCAgent(
+        slate_size=env_cfg.slate_size,
+        candidate_features=np.zeros((env_cfg.num_candidates, env_cfg.item_dim)),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
+    "bc": _build_bc,
     "boltzmann_linear": _build_boltzmann_linear,
     "eps_greedy_linear": _build_eps_greedy_linear,
     "lin_ts": _build_lin_ts,
