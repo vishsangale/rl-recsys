@@ -162,3 +162,21 @@ def test_logged_missing_file_raises(tmp_path):
     })
     with pytest.raises(FileNotFoundError, match="prepare_data"):
         build_env(cfg)
+
+
+def test_agent_registry_contains_existing_agents():
+    from rl_recsys.agents.factory import AGENT_REGISTRY
+
+    assert "random" in AGENT_REGISTRY
+    assert "linucb" in AGENT_REGISTRY
+
+
+def test_build_agent_unknown_name_raises_valueerror():
+    from rl_recsys.agents.factory import build_agent
+    from rl_recsys.config import AgentConfig, EnvConfig
+
+    with pytest.raises(ValueError, match="Unknown agent"):
+        build_agent(
+            AgentConfig(name="not-real"),
+            EnvConfig(slate_size=3, user_dim=4, item_dim=3, num_candidates=10),
+        )
