@@ -179,3 +179,73 @@ def test_loader_empty_session_filter_raises_on_iter(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="session_filter"):
         list(source.iter_trajectories(max_trajectories=10, seed=0))
+
+
+def test_pretrained_linucb_diverges_from_fresh_linucb(tmp_path: Path) -> None:
+    from rl_recsys.evaluation.behavior_policy import (
+        fit_behavior_policy_with_calibration,
+    )
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    from rl_recsys.evaluation import evaluate_trajectory_ope_agent
+    from rl_recsys.agents import LinUCBAgent
+    from rl_recsys.training import (
+        pretrain_agent_on_logged, split_session_ids,
+    )
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for sid in range(60):
+        for seq in range(2):
+            rows.append({
+                "session_id": sid,
+                "sequence_id": seq,
+                "user_state": rng.standard_normal(2).tolist(),
+                "slate": [int(rng.integers(0, 3)), int(rng.integers(0, 3))],
+                "user_feedback": [int(rng.integers(0, 2)), int(rng.integers(0, 2))],
+                "item_features": [[0.0, 0.0], [1.0, 0.0]],
+            })
+    parquet = tmp_path / "sessions_b.parquet"
+    pd.DataFrame(rows).to_parquet(parquet, index=False)
+
+    model = fit_behavior_policy_with_calibration(
+        parquet, user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        epochs=5, batch_size=16, seed=0, nll_threshold=10.0,
+    )
+
+    train_ids, eval_ids = split_session_ids(parquet, train_fraction=0.5, seed=42)
+
+    train_source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+        session_filter=train_ids,
+    )
+    eval_source_fresh = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+        session_filter=eval_ids,
+    )
+    eval_source_pretrained = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+        session_filter=eval_ids,
+    )
+
+    fresh = LinUCBAgent(slate_size=2, user_dim=2, item_dim=2, alpha=1.0)
+    pretrained = LinUCBAgent(slate_size=2, user_dim=2, item_dim=2, alpha=1.0)
+    pretrain_agent_on_logged(pretrained, train_source)
+
+    fresh_result = evaluate_trajectory_ope_agent(
+        eval_source_fresh, fresh, agent_name="fresh",
+        max_trajectories=60, seed=0, gamma=0.95, temperature=1.0,
+    )
+    pretrained_result = evaluate_trajectory_ope_agent(
+        eval_source_pretrained, pretrained, agent_name="pretrained",
+        max_trajectories=60, seed=0, gamma=0.95, temperature=1.0,
+    )
+
+    assert np.isfinite(fresh_result.avg_seq_dr_value)
+    assert np.isfinite(pretrained_result.avg_seq_dr_value)
+    # The two values must differ — pretraining changed agent.score_items.
+    assert (
+        abs(fresh_result.avg_seq_dr_value - pretrained_result.avg_seq_dr_value)
+        > 1e-6
+    )
