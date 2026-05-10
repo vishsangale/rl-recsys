@@ -61,28 +61,62 @@ def main() -> None:
         epochs=5, batch_size=512, seed=0,
     )
 
-    def make_source() -> RL4RSTrajectoryOPESource:
+    from rl_recsys.training import (
+        pretrain_agent_on_logged, split_session_ids,
+    )
+
+    train_ids, eval_ids = split_session_ids(
+        parquet, train_fraction=0.5, seed=42,
+    )
+    print(
+        f"split: train={len(train_ids)} sessions, eval={len(eval_ids)} sessions",
+        flush=True,
+    )
+
+    def make_train_source() -> RL4RSTrajectoryOPESource:
         return RL4RSTrajectoryOPESource(
-            parquet_path=parquet, behavior_policy=model, slate_size=SLATE_SIZE,
+            parquet_path=parquet, behavior_policy=model,
+            slate_size=SLATE_SIZE, session_filter=train_ids,
         )
 
-    print("\n--- LinUCB ---", flush=True)
+    def make_eval_source() -> RL4RSTrajectoryOPESource:
+        return RL4RSTrajectoryOPESource(
+            parquet_path=parquet, behavior_policy=model,
+            slate_size=SLATE_SIZE, session_filter=eval_ids,
+        )
+
+    def make_linucb() -> LinUCBAgent:
+        agent = LinUCBAgent(
+            slate_size=SLATE_SIZE, user_dim=USER_DIM,
+            item_dim=ITEM_DIM, alpha=1.0,
+        )
+        metrics = pretrain_agent_on_logged(agent, make_train_source())
+        print(
+            f"  pretrain: {metrics['trajectories']:.0f} traj, "
+            f"{metrics['total_steps']:.0f} steps, "
+            f"mean_click_rate={metrics['mean_click_rate']:.3f}, "
+            f"{metrics['seconds']:.1f}s",
+            flush=True,
+        )
+        return agent
+
+    print("\n--- LinUCB (with offline pretrain) ---", flush=True)
     linucb_result = evaluate_trajectory_ope_with_variance(
-        make_source=make_source,
-        make_agent=lambda: LinUCBAgent(
-            slate_size=SLATE_SIZE, user_dim=USER_DIM, item_dim=ITEM_DIM, alpha=1.0,
-        ),
+        make_source=make_eval_source,
+        make_agent=make_linucb,
         agent_name="linucb",
-        max_trajectories=5000, n_seeds=3, base_seed=42, gamma=0.95, temperature=1.0,
+        max_trajectories=5000, n_seeds=3, base_seed=42,
+        gamma=0.95, temperature=1.0,
     )
     print(linucb_result, flush=True)
 
     print("\n--- Random ---", flush=True)
     random_result = evaluate_trajectory_ope_with_variance(
-        make_source=make_source,
+        make_source=make_eval_source,
         make_agent=lambda: RandomAgent(slate_size=SLATE_SIZE, seed=0),
         agent_name="random",
-        max_trajectories=5000, n_seeds=3, base_seed=42, gamma=0.95, temperature=1.0,
+        max_trajectories=5000, n_seeds=3, base_seed=42,
+        gamma=0.95, temperature=1.0,
     )
     print(random_result, flush=True)
 
