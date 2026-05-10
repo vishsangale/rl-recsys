@@ -86,7 +86,14 @@ class BehaviorPolicy(nn.Module):
         candidate_features: np.ndarray,
         slate: np.ndarray,
     ) -> float:
-        """π_b(slate | context) = Π_k softmax(score(·, k))[slate[k]]."""
+        """π_b(slate | context) = Π_k softmax(score(·, k))[slate[k]].
+
+        Sibling of :meth:`slate_log_propensities_batch` (same softmax math).
+        Kept separate because this path supports partial slates (any
+        ``slate.shape[0]`` <= ``self._slate_size``) via ``_score_position``,
+        while the batched method enforces full-width slates via
+        ``_score_batch``. Future scoring fixes must land in both methods.
+        """
         user = torch.as_tensor(user_features, dtype=torch.float64, device=self._device)
         cand = torch.as_tensor(candidate_features, dtype=torch.float64, device=self._device)
         slate_t = torch.as_tensor(np.asarray(slate, dtype=np.int64))
