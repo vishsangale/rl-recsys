@@ -80,8 +80,12 @@ def run_grid(
             # BC/GBDT need the real candidate_features from the source
             # before training. The factory builds them with placeholders
             # because it can't see the source.
+            # Guard: only overwrite when the agent stores _candidate_features
+            # as a data attribute (ndarray), NOT when it's a bound method
+            # (e.g. LinUCBAgent._candidate_features computes features on the fly).
             if (
                 hasattr(agent, "_candidate_features")
+                and not callable(agent._candidate_features)
                 and hasattr(train_src, "_candidate_features")
             ):
                 agent._candidate_features = train_src._candidate_features
