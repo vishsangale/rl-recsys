@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
 
 def pretrain_agent_on_logged(
-    agent: "Agent",
-    source: "LoggedTrajectorySource",
+    agent: Agent,
+    source: LoggedTrajectorySource,
     *,
     max_trajectories: int | None = None,
     seed: int = 0,
