@@ -4,12 +4,10 @@ Items deferred from prior batches and observations that surfaced during runs. Or
 
 ## Next up
 
-### Batch the loader's `slate_propensity` calls
-Cause #2 (LinUCB has no offline history) was addressed in this batch — `pretrain_agent_on_logged` + 50/50 session split + `session_filter` on the loader are wired and tested (193/193 green). The real-data run was attempted on RTX 5080 but **stalled**: `RL4RSTrajectoryOPESource.iter_trajectories` calls `self._policy.slate_propensity(...)` once per step, sequentially. With 219K train sessions × ~1.78 mean steps × 3 seeds ≈ 1.2M sequential CUDA forward passes (each just a 9-position softmax over 283 candidates), the GPU sits at 94% util but each call is launch-overhead dominated. After 1h of pretrain on the train half, no `pretrain:` line had printed.
+### Real-data run on the new batched-propensity loader
+Propensity batching landed in this batch (`BehaviorPolicy.slate_log_propensities_batch` + `RL4RSTrajectoryOPESource` precompute at `__init__`, commits `a9ab465..d607e50`). Parity to per-row `slate_propensity` is guarded by a 1e-12 unit test. The real-data benchmark on `data/processed/rl4rs/sessions_b.parquet` was deferred because another tenant (paper2/bet1_surprise) was holding 15.6 GB of the 16 GB RTX 5080 at the time.
 
-Fix: pre-compute propensities at loader-init time (or in `iter_trajectories` first call) by collecting all (user_state, slate) tuples and running ONE big batched forward through `BehaviorPolicy._score_batch` (already vectorized for fit/calibration). Then look up by `(session_id, sequence_id)`. Memory cost: ~390K floats = 3MB. Wall clock should drop from hours to seconds.
-
-After that, re-run `scripts/benchmark_rl4rs_b_seq_dr.py` and capture the LinUCB-with-pretrain vs Random table here.
+Once the GPU is free, run `scripts/benchmark_rl4rs_b_seq_dr.py 2>&1 | tee /tmp/seq_dr_pretrain_run_v2.log`. Expect each `propensity precompute: …` line to land within a few minutes (vs. the prior unbounded stall). Capture the new LinUCB-with-pretrain vs Random `avg_seq_dr_value ± std` table here. If discriminative, pivot to causes #1 and #3 below.
 
 ### Then: causes #1 and #3 from the prior batch
 Once LinUCB has signal:
