@@ -29,6 +29,9 @@ def split_session_ids(
 
     Returns (train_ids, eval_ids). Raises ValueError if train_fraction is
     not in (0, 1) or if either side is empty.
+
+    Granularity: bucket modulus is 1000, so train_fraction is effectively
+    quantized to 0.001 increments.
     """
     if not (0.0 < train_fraction < 1.0):
         raise ValueError(

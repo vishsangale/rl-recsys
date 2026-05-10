@@ -61,10 +61,13 @@ def test_split_rejects_empty_split(tmp_path: Path) -> None:
     p = tmp_path / "sessions_b.parquet"
     pd.DataFrame(rows).to_parquet(p, index=False)
 
+    # With train_fraction=0.001 and n=2, both sessions almost always land
+    # in the eval side (threshold=1, only bucket==0 is train). Sweep seeds
+    # to find one where the train side is empty and confirm the raise.
     raised = False
     for seed in range(50):
         try:
-            split_session_ids(p, train_fraction=0.999, seed=seed)
+            split_session_ids(p, train_fraction=0.001, seed=seed)
         except ValueError as e:
             if "empty" in str(e):
                 raised = True
