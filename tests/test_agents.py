@@ -127,3 +127,48 @@ def test_hydra_can_load_linucb_agent_config() -> None:
 
     assert cfg.agent.name == "linucb"
     assert cfg.agent.alpha == 1.0
+
+
+def test_agent_score_items_default_returns_zeros():
+    from rl_recsys.agents.random import RandomAgent
+    from rl_recsys.environments.base import RecObs
+
+    agent = RandomAgent(slate_size=3)
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+    )
+    scores = agent.score_items(obs)
+    assert scores.shape == (10,)
+    assert np.allclose(scores, 0.0)
+
+
+def test_agent_train_offline_default_calls_pretrain_helper():
+    # The default delegates to pretrain_agent_on_logged, which calls
+    # agent.update for every step. We assert by counting metrics returned
+    # against a fake source that yields one trajectory of two steps.
+    from rl_recsys.agents.linucb import LinUCBAgent
+    from rl_recsys.environments.base import RecObs
+    from rl_recsys.evaluation.ope_trajectory import LoggedTrajectoryStep
+
+    class _FakeSource:
+        def iter_trajectories(self, *, max_trajectories=None, seed=0):
+            obs = RecObs(
+                user_features=np.zeros(4),
+                candidate_features=np.zeros((10, 3)),
+                candidate_ids=np.arange(10, dtype=np.int64),
+            )
+            step = LoggedTrajectoryStep(
+                obs=obs,
+                logged_action=np.array([0, 1, 2], dtype=np.int64),
+                logged_reward=1.0,
+                logged_clicks=np.array([1, 0, 0], dtype=np.int64),
+                propensity=0.1,
+            )
+            yield [step, step]
+
+    agent = LinUCBAgent(slate_size=3, user_dim=4, item_dim=3)
+    metrics = agent.train_offline(_FakeSource(), seed=0)
+    assert metrics["total_steps"] == 2.0
+    assert metrics["trajectories"] == 1.0
