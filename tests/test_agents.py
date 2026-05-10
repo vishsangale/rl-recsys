@@ -130,10 +130,17 @@ def test_hydra_can_load_linucb_agent_config() -> None:
 
 
 def test_agent_score_items_default_returns_zeros():
-    from rl_recsys.agents.random import RandomAgent
+    from rl_recsys.agents.base import Agent
     from rl_recsys.environments.base import RecObs
 
-    agent = RandomAgent(slate_size=3)
+    class _MinimalAgent(Agent):
+        def select_slate(self, obs):
+            return np.zeros(3, dtype=np.int64)
+
+        def update(self, obs, slate, reward, clicks, next_obs):
+            return {}
+
+    agent = _MinimalAgent()
     obs = RecObs(
         user_features=np.zeros(4),
         candidate_features=np.zeros((10, 3)),

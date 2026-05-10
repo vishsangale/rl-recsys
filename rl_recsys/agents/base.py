@@ -39,12 +39,13 @@ class Agent(ABC):
 
     def train_offline(
         self,
-        source: "LoggedTrajectorySource",
+        source: LoggedTrajectorySource,
         *,
         seed: int = 0,
     ) -> dict[str, float]:
         """Train on a logged trajectory source. Default: per-step update via
         pretrain_agent_on_logged. Heuristic agents override with no-op;
         DL/batch agents override with their own training loop."""
+        # local import: offline_pretrain imports Agent, so a top-level import would be circular
         from rl_recsys.training.offline_pretrain import pretrain_agent_on_logged
         return pretrain_agent_on_logged(self, source, seed=seed)
