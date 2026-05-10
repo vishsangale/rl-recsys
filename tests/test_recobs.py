@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from rl_recsys.environments.base import HistoryStep, RecObs
 
@@ -37,5 +36,7 @@ def test_recobs_accepts_history_and_logged_fields():
         logged_clicks=np.array([0, 1, 0]),
     )
     assert len(obs.history) == 1
+    assert obs.history[0].slate.tolist() == [0]
+    assert obs.history[0].clicks.tolist() == [1]
     assert obs.logged_action.tolist() == [1, 2, 3]
     assert obs.logged_clicks.tolist() == [0, 1, 0]

@@ -1,4 +1,4 @@
-from rl_recsys.environments.base import RecEnv, RecObs, RecStep
+from rl_recsys.environments.base import HistoryStep, RecEnv, RecObs, RecStep
 from rl_recsys.environments.finn_no_slate import FinnNoSlateEnv
 from rl_recsys.environments.kuairec import KuaiRecEnv
 from rl_recsys.environments.logged import LoggedInteractionEnv
@@ -8,6 +8,7 @@ from rl_recsys.environments.synthetic import SyntheticEnv
 
 __all__ = [
     "FinnNoSlateEnv",
+    "HistoryStep",
     "KuaiRecEnv",
     "LoggedBanditEvent",
     "LoggedInteractionEnv",

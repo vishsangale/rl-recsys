@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-@dataclass
+@dataclass(frozen=True)
 class HistoryStep:
     """One past step within the current session.
 
