@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+import torch
+
 from rl_recsys.agents.base import Agent
 from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
 from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
@@ -10,11 +12,21 @@ from rl_recsys.agents.lin_ts import LinTSAgent
 from rl_recsys.agents.linucb import LinUCBAgent
 from rl_recsys.agents.logged_replay import LoggedReplayAgent
 from rl_recsys.agents.most_popular import MostPopularAgent
+from rl_recsys.agents.neural_linear import NeuralLinearAgent
 from rl_recsys.agents.oracle_click import OracleClickAgent
 from rl_recsys.agents.random import RandomAgent
 from rl_recsys.config import AgentConfig, EnvConfig
 
 AgentBuilder = Callable[[AgentConfig, EnvConfig], Agent]
+
+
+def _safe_device(agent_cfg: AgentConfig) -> str:
+    """Downgrade 'cuda' to 'cpu' when CUDA isn't available so factory builders
+    work both on dev boxes and CI."""
+    requested = getattr(agent_cfg, "device", "cuda")
+    if requested == "cuda" and not torch.cuda.is_available():
+        return "cpu"
+    return requested
 
 
 def _build_random(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
@@ -72,6 +84,19 @@ def _build_boltzmann_linear(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent
     )
 
 
+def _build_neural_linear(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return NeuralLinearAgent(
+        slate_size=env_cfg.slate_size,
+        user_dim=env_cfg.user_dim,
+        item_dim=env_cfg.item_dim,
+        hidden_dim=getattr(agent_cfg, "hidden_dim", 64),
+        embedding_dim=getattr(agent_cfg, "embedding_dim", 32),
+        mlp_epochs=getattr(agent_cfg, "epochs", 5),
+        alpha=getattr(agent_cfg, "alpha", 1.0),
+        device=_safe_device(agent_cfg),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "boltzmann_linear": _build_boltzmann_linear,
     "eps_greedy_linear": _build_eps_greedy_linear,
@@ -79,6 +104,7 @@ AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "linucb": _build_linucb,
     "logged_replay": _build_logged_replay,
     "most_popular": _build_most_popular,
+    "neural_linear": _build_neural_linear,
     "oracle_click": _build_oracle_click,
     "random": _build_random,
 }
