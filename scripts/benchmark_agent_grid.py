@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import pandas as pd
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
@@ -55,11 +56,17 @@ def main() -> None:
     )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(
-        "--slate-size", type=int, default=9,
-        help="RL4RS-B uses 9; override only for synthetic smoke tests",
+        "--slate-size", type=int, default=None,
+        help="Auto-detected from parquet by default; override for synthetic tests",
     )
-    parser.add_argument("--user-dim", type=int, default=10)
-    parser.add_argument("--item-dim", type=int, default=10)
+    parser.add_argument(
+        "--user-dim", type=int, default=None,
+        help="Auto-detected from parquet by default",
+    )
+    parser.add_argument(
+        "--item-dim", type=int, default=None,
+        help="Auto-detected from parquet by default",
+    )
     args = parser.parse_args()
 
     if args.dataset != "rl4rs_b":
@@ -74,35 +81,48 @@ def main() -> None:
 
     train_ids, eval_ids = split_session_ids(args.parquet, train_fraction=0.5)
 
-    # Auto-detect num_items from the parquet (mirrors benchmark_rl4rs_b_seq_dr).
+    # Auto-detect dims from the parquet (mirrors benchmark_rl4rs_b_seq_dr).
+    df_dims = pd.read_parquet(
+        args.parquet, columns=["user_state", "item_features", "slate"],
+    )
+    user_dim = args.user_dim or len(df_dims["user_state"].iloc[0])
+    item_dim = args.item_dim or len(df_dims["item_features"].iloc[0][0])
+    slate_size = args.slate_size or len(df_dims["slate"].iloc[0])
+    del df_dims
+
     slate_table = pq.read_table(args.parquet, columns=["slate"])
     flat_items = slate_table["slate"].combine_chunks().flatten()
     num_items = int(pc.count_distinct(flat_items).as_py())
+    print(
+        f"detected dims: user={user_dim}, item={item_dim}, "
+        f"slate={slate_size}, num_items={num_items}",
+        flush=True,
+    )
 
     behavior = fit_behavior_policy_with_calibration(
         args.parquet,
-        user_dim=args.user_dim, item_dim=args.item_dim,
-        slate_size=args.slate_size, num_items=num_items,
+        user_dim=user_dim, item_dim=item_dim,
+        slate_size=slate_size, num_items=num_items,
         epochs=5, batch_size=512, seed=0,
     )
 
     def train_factory(seed: int) -> RL4RSTrajectoryOPESource:
         return RL4RSTrajectoryOPESource(
-            args.parquet, behavior, slate_size=args.slate_size,
+            args.parquet, behavior, slate_size=slate_size,
             session_filter=train_ids,
         )
 
     def eval_factory(seed: int) -> RL4RSTrajectoryOPESource:
         return RL4RSTrajectoryOPESource(
-            args.parquet, behavior, slate_size=args.slate_size,
+            args.parquet, behavior, slate_size=slate_size,
             session_filter=eval_ids,
         )
 
     sample = train_factory(seeds[0])
     env_kwargs = dict(
-        slate_size=args.slate_size,
-        user_dim=args.user_dim,
-        item_dim=args.item_dim,
+        slate_size=slate_size,
+        user_dim=user_dim,
+        item_dim=item_dim,
         num_candidates=len(sample._candidate_ids),
     )
 
