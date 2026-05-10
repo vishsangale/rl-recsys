@@ -11,5 +11,6 @@ from rl_recsys.agents.most_popular import MostPopularAgent
 from rl_recsys.agents.neural_linear import NeuralLinearAgent
 from rl_recsys.agents.oracle_click import OracleClickAgent
 from rl_recsys.agents.random import RandomAgent
+from rl_recsys.agents.sasrec import SASRecAgent
 
-__all__ = ["Agent", "BCAgent", "BoltzmannLinearAgent", "EpsGreedyLinearAgent", "GBDTAgent", "LinTSAgent", "LinUCBAgent", "LoggedReplayAgent", "MostPopularAgent", "NeuralLinearAgent", "OracleClickAgent", "RandomAgent", "build_agent"]
+__all__ = ["Agent", "BCAgent", "BoltzmannLinearAgent", "EpsGreedyLinearAgent", "GBDTAgent", "LinTSAgent", "LinUCBAgent", "LoggedReplayAgent", "MostPopularAgent", "NeuralLinearAgent", "OracleClickAgent", "RandomAgent", "SASRecAgent", "build_agent"]
