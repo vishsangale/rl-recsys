@@ -293,6 +293,8 @@ def test_loader_history_accumulates_within_session(tmp_path: Path) -> None:
     s1 = next(t for t in trajectories if len(t) == 2)
     assert len(s1[0].obs.history) == 0
     assert len(s1[1].obs.history) == 1
+    np.testing.assert_array_equal(s1[1].obs.history[0].slate, s1[0].logged_action)
+    np.testing.assert_array_equal(s1[1].obs.history[0].clicks, s1[0].logged_clicks)
 
 
 def test_loader_history_resets_between_sessions(tmp_path: Path) -> None:
@@ -308,9 +310,14 @@ def test_loader_history_resets_between_sessions(tmp_path: Path) -> None:
         parquet_path=parquet, behavior_policy=model, slate_size=2,
     )
     trajs = list(source.iter_trajectories(max_trajectories=10, seed=0))
-    # Both sessions start with empty history at step 0.
-    for traj in trajs:
-        assert len(traj[0].obs.history) == 0
+    long_traj = next(t for t in trajs if len(t) == 2)
+    short_traj = next(t for t in trajs if len(t) == 1)
+
+    # After processing session 1 (2 steps), session 2 must still start clean.
+    assert len(short_traj[0].obs.history) == 0
+    # And it must not contain any slate from session 1's log.
+    for hist_step in short_traj[0].obs.history:
+        assert not np.array_equal(hist_step.slate, long_traj[0].logged_action)
 
 
 def test_loader_obs_logged_action_matches_step_logged_action(tmp_path: Path) -> None:
