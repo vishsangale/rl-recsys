@@ -9,6 +9,7 @@ import torch
 from rl_recsys.agents.base import Agent
 from rl_recsys.agents.bc import BCAgent
 from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
+from rl_recsys.agents.gbdt import GBDTAgent
 from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
 from rl_recsys.agents.lin_ts import LinTSAgent
 from rl_recsys.agents.linucb import LinUCBAgent
@@ -108,9 +109,20 @@ def _build_bc(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_gbdt(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return GBDTAgent(
+        slate_size=env_cfg.slate_size,
+        candidate_features=np.zeros((env_cfg.num_candidates, env_cfg.item_dim)),
+        n_estimators=getattr(agent_cfg, "n_estimators", 100),
+        max_depth=getattr(agent_cfg, "max_depth", 6),
+        learning_rate=getattr(agent_cfg, "learning_rate", 0.05),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "bc": _build_bc,
     "boltzmann_linear": _build_boltzmann_linear,
+    "gbdt": _build_gbdt,
     "eps_greedy_linear": _build_eps_greedy_linear,
     "lin_ts": _build_lin_ts,
     "linucb": _build_linucb,

@@ -75,3 +75,30 @@ def test_bc_raises_when_score_called_without_policy():
     )
     with pytest.raises(RuntimeError, match="behavior_policy"):
         agent.score_items(obs)
+
+
+def test_gbdt_train_offline_returns_metrics():
+    from rl_recsys.agents.gbdt import GBDTAgent
+
+    agent = GBDTAgent(
+        slate_size=3, candidate_features=np.eye(8, 3),
+        n_estimators=10, max_depth=3,
+    )
+    metrics = agent.train_offline(_StubSource(), seed=0)
+    assert "n_train_rows" in metrics
+
+
+def test_gbdt_score_shape():
+    from rl_recsys.agents.gbdt import GBDTAgent
+
+    agent = GBDTAgent(
+        slate_size=3, candidate_features=np.eye(8, 3),
+        n_estimators=10, max_depth=3,
+    )
+    agent.train_offline(_StubSource(), seed=0)
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.eye(8, 3),
+        candidate_ids=np.arange(8, dtype=np.int64),
+    )
+    assert agent.score_items(obs).shape == (8,)

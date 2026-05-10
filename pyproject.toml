@@ -18,6 +18,7 @@ dependencies = [
     "tqdm>=4.66",
     "pyarrow>=14.0",
     "wandb>=0.19",
+    "lightgbm>=4.0",
 ]
 
 [project.optional-dependencies]
