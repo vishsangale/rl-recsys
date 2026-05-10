@@ -28,11 +28,29 @@ class AgentConfig:
     lr: float = 1e-3
     gamma: float = 0.99
     epsilon: float = 0.1
-    # LinUCB
+    # LinUCB / NeuralLinear
     alpha: float = 1.0
     # Replay buffer
     buffer_size: int = 10000
     batch_size: int = 64
+    # Linear bandit family
+    sigma: float = 1.0
+    temperature: float = 1.0
+    # Neural / DL agents
+    hidden_dim: int = 64
+    embedding_dim: int = 32
+    epochs: int = 5
+    n_heads: int = 2
+    n_blocks: int = 2
+    max_history_len: int = 20
+    clip_c: float = 10.0
+    target_return: float = 10.0
+    context_window: int = 20
+    device: str = "cuda"
+    # GBDT
+    n_estimators: int = 100
+    max_depth: int = 6
+    learning_rate: float = 0.05
 
 
 @dataclass
