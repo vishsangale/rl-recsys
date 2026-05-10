@@ -31,10 +31,14 @@ class RL4RSTrajectoryOPESource:
         behavior_policy: BehaviorPolicy,
         *,
         slate_size: int,
+        session_filter: set[int] | None = None,
     ) -> None:
         self._df = pd.read_parquet(parquet_path)
         self._policy = behavior_policy
         self._slate_size = int(slate_size)
+        self._session_filter = (
+            None if session_filter is None else {int(s) for s in session_filter}
+        )
 
         # Build the candidate universe from the slate column. Using
         # pyarrow.compute.unique on the flat list-array is ~7x faster than a
@@ -70,6 +74,16 @@ class RL4RSTrajectoryOPESource:
         rng = np.random.default_rng(0 if seed is None else seed)
         if seed is not None:
             rng.shuffle(session_ids)
+
+        if self._session_filter is not None:
+            session_ids = [
+                sid for sid in session_ids if int(sid) in self._session_filter
+            ]
+            if not session_ids:
+                raise ValueError(
+                    "session_filter excludes every session in the parquet — "
+                    "no trajectories to emit"
+                )
 
         emitted = 0
         for sid in session_ids:

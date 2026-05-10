@@ -136,3 +136,46 @@ def test_end_to_end_seq_dr_on_synthetic_b_fixture(tmp_path: Path) -> None:
     assert np.isfinite(result.avg_logged_discounted_return)
     assert result.ess > 0.0
     assert result.trajectories > 0
+
+
+def test_loader_session_filter_yields_only_filtered_sessions(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+
+    # Filter to only session 1
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+        session_filter={1},
+    )
+    trajectories = list(source.iter_trajectories(max_trajectories=10, seed=0))
+
+    # Only session 1 emitted (it has 2 steps)
+    assert len(trajectories) == 1
+    assert len(trajectories[0]) == 2
+    # Universe still includes all items from the full parquet (10, 11, 12)
+    assert source._candidate_ids.tolist() == [10, 11, 12]
+
+
+def test_loader_empty_session_filter_raises_on_iter(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    import pytest
+    parquet = _fixture_b_parquet(tmp_path)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    # Filter excludes everything
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+        session_filter={9999},
+    )
+    with pytest.raises(ValueError, match="session_filter"):
+        list(source.iter_trajectories(max_trajectories=10, seed=0))
