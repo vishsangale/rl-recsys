@@ -4,13 +4,41 @@ Items deferred from prior batches and observations that surfaced during runs. Or
 
 ## Next up
 
-### Real-data run on the new batched-propensity loader
-Propensity batching landed in this batch (`BehaviorPolicy.slate_log_propensities_batch` + `RL4RSTrajectoryOPESource` precompute at `__init__`, commits `a9ab465..d607e50`). Parity to per-row `slate_propensity` is guarded by a 1e-12 unit test. The real-data benchmark on `data/processed/rl4rs/sessions_b.parquet` was deferred because another tenant (paper2/bet1_surprise) was holding 15.6 GB of the 16 GB RTX 5080 at the time.
+### Sub-project #1 results — multi-agent ablation grid on RL4RS-B (2026-05-10)
 
-Once the GPU is free, run `scripts/benchmark_rl4rs_b_seq_dr.py 2>&1 | tee /tmp/seq_dr_pretrain_run_v2.log`. Expect each `propensity precompute: …` line to land within a few minutes (vs. the prior unbounded stall). Capture the new LinUCB-with-pretrain vs Random `avg_seq_dr_value ± std` table here. If discriminative, pivot to causes #1 and #3 below.
+First real-data pass shipped. Scope: 9 CPU-friendly agents × 1 seed × pretrained ∈ {True, False}, 500 trajectories. Full table at `results/agent_grid/2026-05-10/summary.md`. Per-run JSON artifacts in the same directory.
+
+| agent | pretrained=False | pretrained=True |
+|---|---|---|
+| gbdt | — | 9.919 |
+| logged_replay | 49.912 | 49.912 |
+| bc | 10.494 | 10.494 |
+| lin_ts | 10.494 | 10.494 |
+| most_popular | 10.134 | 10.494 |
+| random | 10.134 | 10.134 |
+| linucb | 10.494 | 10.010 |
+| boltzmann_linear | 10.134 | 10.000 |
+| eps_greedy_linear | 10.134 | 10.000 |
+
+`avg_logged_discounted_return = 10.499` constant across all agents (property of the data).
+
+**Observations.**
+- Most pretrained agents land at ~10.5, identical to the logged baseline to 3 decimals. Same "all agents look like the behavior policy" pattern from the prior batch — the Boltzmann T=1 shim still smooths target probs toward μ.
+- `logged_replay` reads **49.9**, well above the 10.5 baseline. This is not a bug — its `score_items` peaks 1.0 on the logged slate, so the temperature-1 softmax assigns much more mass to the logged action than μ does, IS weights blow up, and DR variance explodes. ESS for this agent is 30.7 / 500 logged steps (~6 %). The OPE estimator is unreliable here, not the agent — the takeaway is that the sanity-check we wanted (DR ≈ logged baseline) requires either a sharper score (e.g. 100/0 instead of 1/0) or a colder temperature.
+- `gbdt` pretrained=False FAILED as expected (model is None until `train_offline` runs). The runner correctly wrote `gbdt_seed0_pretrained0.failed.json` and the aggregator skipped it. Future: either give batch-trained agents a sensible no-model fallback (uniform scores) or skip pretrained=False for them in the runner.
+- Std = 0.0 throughout because only seed 0 ran. Expand to seeds {0, 1, 2} for variance bars.
+
+**Caveats / deferred.**
+- DL agents (NeuralLinear, SASRec, TopK REINFORCE, Decision Transformer) skipped in this run. They need either a CUDA window or hours of CPU time. Add them when GPU frees up.
+- Boltzmann T sweep (cause #3 from the prior batch) still open.
+
+**Next decisions** — pick one before re-running:
+1. **Re-run the full grid with 3 seeds + DL agents** once GPU is free for ~3-4 hours. Capture proper mean ± std table.
+2. **Fix the LoggedReplay sanity check first** — pick a score magnitude that yields target ≈ μ, document it in the agent docstring, re-run.
+3. **Move to sub-project #5 (DM reward model)** — none of the bandit family is discriminative under the current shim, so a trained DM is the natural next leverage point. T sweep + DM reward model together would actually move the needle.
 
 ### Then: causes #1 and #3 from the prior batch
-Once LinUCB has signal:
+Once a discriminative signal exists:
 
 1. **Behavior model barely beats uniform.** Trained NLL = 5.168 vs uniform NLL `log(283) = 5.645`. Either RL4RS-B's logging policy really is near-flat or the MLP is undertrained at 5 epochs / batch_size=512. Try (a) more epochs, (b) wider MLP, (c) add positional / sequential context features.
 2. **Boltzmann shim at T=1.0 smooths heavily.** Even with a trained agent, T=1 with similar score magnitudes drives target probs toward uniform. Sweep T ∈ {0.1, 0.3, 1.0, 3.0} and report the curve.
