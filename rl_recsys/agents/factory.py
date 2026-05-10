@@ -19,6 +19,7 @@ from rl_recsys.agents.neural_linear import NeuralLinearAgent
 from rl_recsys.agents.oracle_click import OracleClickAgent
 from rl_recsys.agents.random import RandomAgent
 from rl_recsys.agents.sasrec import SASRecAgent
+from rl_recsys.agents.topk_reinforce import TopKReinforceAgent
 from rl_recsys.config import AgentConfig, EnvConfig
 
 AgentBuilder = Callable[[AgentConfig, EnvConfig], Agent]
@@ -134,6 +135,21 @@ def _build_sasrec(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_topk_reinforce(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return TopKReinforceAgent(
+        slate_size=env_cfg.slate_size,
+        num_candidates=env_cfg.num_candidates,
+        item_dim=env_cfg.item_dim,
+        hidden_dim=getattr(agent_cfg, "hidden_dim", 64),
+        n_heads=getattr(agent_cfg, "n_heads", 2),
+        n_blocks=getattr(agent_cfg, "n_blocks", 2),
+        max_history_len=getattr(agent_cfg, "max_history_len", 20),
+        epochs=getattr(agent_cfg, "epochs", 10),
+        clip_c=getattr(agent_cfg, "clip_c", 10.0),
+        device=_safe_device(agent_cfg),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "bc": _build_bc,
     "boltzmann_linear": _build_boltzmann_linear,
@@ -147,6 +163,7 @@ AGENT_REGISTRY: dict[str, AgentBuilder] = {
     "oracle_click": _build_oracle_click,
     "random": _build_random,
     "sasrec": _build_sasrec,
+    "topk_reinforce": _build_topk_reinforce,
 }
 
 
