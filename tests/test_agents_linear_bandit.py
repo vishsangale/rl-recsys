@@ -76,3 +76,37 @@ def test_lints_score_shape_matches_num_candidates():
     )
     agent = LinTSAgent(slate_size=3, user_dim=4, item_dim=3)
     assert agent.score_items(obs).shape == (7,)
+
+
+def test_eps_greedy_explores_at_eps_one():
+    from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.eye(8, 3),
+        candidate_ids=np.arange(8, dtype=np.int64),
+    )
+    agent = EpsGreedyLinearAgent(
+        slate_size=3, user_dim=4, item_dim=3,
+        epsilon=1.0, rng=np.random.default_rng(0),
+    )
+    slate = agent.select_slate(obs)
+    assert slate.shape == (3,)
+    assert len(set(slate.tolist())) == 3
+
+
+def test_eps_greedy_exploits_at_eps_zero():
+    from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
+
+    obs = RecObs(
+        user_features=np.array([1.0, 0, 0, 0]),
+        candidate_features=np.eye(8, 3),
+        candidate_ids=np.arange(8, dtype=np.int64),
+    )
+    agent = EpsGreedyLinearAgent(
+        slate_size=3, user_dim=4, item_dim=3,
+        epsilon=0.0,
+    )
+    scores = agent.score_items(obs)
+    expected_top3 = set(np.argsort(scores)[-3:].tolist())
+    assert set(agent.select_slate(obs).tolist()) == expected_top3

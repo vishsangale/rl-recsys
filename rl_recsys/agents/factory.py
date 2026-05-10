@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Callable
 
 from rl_recsys.agents.base import Agent
+from rl_recsys.agents.eps_greedy_linear import EpsGreedyLinearAgent
 from rl_recsys.agents.lin_ts import LinTSAgent
 from rl_recsys.agents.linucb import LinUCBAgent
 from rl_recsys.agents.logged_replay import LoggedReplayAgent
@@ -52,13 +53,23 @@ def _build_lin_ts(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
     )
 
 
+def _build_eps_greedy_linear(agent_cfg: AgentConfig, env_cfg: EnvConfig) -> Agent:
+    return EpsGreedyLinearAgent(
+        slate_size=env_cfg.slate_size,
+        user_dim=env_cfg.user_dim,
+        item_dim=env_cfg.item_dim,
+        epsilon=getattr(agent_cfg, "epsilon", 0.1),
+    )
+
+
 AGENT_REGISTRY: dict[str, AgentBuilder] = {
-    "random": _build_random,
-    "linucb": _build_linucb,
+    "eps_greedy_linear": _build_eps_greedy_linear,
     "lin_ts": _build_lin_ts,
+    "linucb": _build_linucb,
     "logged_replay": _build_logged_replay,
     "most_popular": _build_most_popular,
     "oracle_click": _build_oracle_click,
+    "random": _build_random,
 }
 
 
