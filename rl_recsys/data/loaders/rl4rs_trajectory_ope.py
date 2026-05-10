@@ -83,12 +83,17 @@ class RL4RSTrajectoryOPESource:
                 np.array(list(u), dtype=np.float64)
                 for u in self._ordered["user_state"]
             ])
-            slate_indices = np.stack([
-                np.array(
-                    [self._cand_id_to_idx[int(x)] for x in s], dtype=np.int64,
-                )
-                for s in self._ordered["slate"]
-            ])
+            try:
+                slate_indices = np.stack([
+                    np.array(
+                        [self._cand_id_to_idx[int(x)] for x in s], dtype=np.int64,
+                    )
+                    for s in self._ordered["slate"]
+                ])
+            except KeyError as exc:
+                raise ValueError(
+                    f"logged slate item not found in candidate universe — {exc}"
+                ) from exc
             started = perf_counter()
             log_props = self._policy.slate_log_propensities_batch(
                 users, slate_indices, self._candidate_features,
@@ -114,7 +119,7 @@ class RL4RSTrajectoryOPESource:
         if seed is not None:
             rng.shuffle(session_ids)
 
-        if not session_ids:
+        if self._session_filter is not None and not session_ids:
             raise ValueError(
                 "session_filter excludes every session in the parquet — "
                 "no trajectories to emit"
@@ -134,16 +139,10 @@ class RL4RSTrajectoryOPESource:
                     list(row.user_feedback), dtype=np.int64,
                 )
 
-                try:
-                    slate_indices = np.array(
-                        [self._cand_id_to_idx[int(x)] for x in logged_slate_ids],
-                        dtype=np.int64,
-                    )
-                except KeyError as exc:
-                    raise ValueError(
-                        f"session {sid}: logged slate item not found in "
-                        f"candidate universe — {exc}"
-                    ) from exc
+                slate_indices = np.array(
+                    [self._cand_id_to_idx[int(x)] for x in logged_slate_ids],
+                    dtype=np.int64,
+                )
 
                 propensity = float(self._propensities[row_pos])
                 obs = RecObs(
