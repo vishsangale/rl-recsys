@@ -200,12 +200,14 @@ def test_evaluate_trajectory_ope_with_variance_smoke() -> None:
             obs=obs,
             logged_action=np.array([0, 1], dtype=np.int64),
             logged_reward=1.0,
+            logged_clicks=np.zeros(2, dtype=np.int64),
             propensity=0.3,
         ),
         LoggedTrajectoryStep(
             obs=obs,
             logged_action=np.array([0, 1], dtype=np.int64),
             logged_reward=0.0,
+            logged_clicks=np.zeros(2, dtype=np.int64),
             propensity=0.3,
         ),
     ]

@@ -47,6 +47,7 @@ class LoggedTrajectoryStep:
     obs: RecObs
     logged_action: np.ndarray  # shape (slate_size,) — candidate indices (positions in obs.candidate_ids)
     logged_reward: float
+    logged_clicks: np.ndarray  # shape (slate_size,) — per-position binary feedback
     propensity: float          # μ(slate | obs) = Π_k μ(slate[k] | obs, k)
 
 

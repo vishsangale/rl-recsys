@@ -60,6 +60,30 @@ def test_loader_emits_trajectories_grouped_by_session(tmp_path: Path) -> None:
             assert 0.0 < step.propensity <= 1.0
 
 
+def test_loader_emits_logged_clicks(tmp_path: Path) -> None:
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0,
+    )
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    trajectories = list(source.iter_trajectories(max_trajectories=10, seed=0))
+
+    s1 = next(t for t in trajectories if len(t) == 2)
+    s2 = next(t for t in trajectories if len(t) == 1)
+
+    np.testing.assert_array_equal(s1[0].logged_clicks, np.array([1, 0]))
+    np.testing.assert_array_equal(s1[1].logged_clicks, np.array([0, 1]))
+    np.testing.assert_array_equal(s2[0].logged_clicks, np.array([0, 0]))
+    assert s1[0].logged_clicks.dtype == np.int64
+
+
 def test_end_to_end_seq_dr_on_synthetic_b_fixture(tmp_path: Path) -> None:
     # Write a tiny multi-step parquet, fit BehaviorPolicy, build the loader,
     # run evaluate_trajectory_ope_agent, assert avg_seq_dr_value is finite

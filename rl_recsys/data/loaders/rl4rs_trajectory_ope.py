@@ -81,6 +81,7 @@ class RL4RSTrajectoryOPESource:
                 user_features = np.array(list(row["user_state"]), dtype=np.float64)
                 logged_slate_ids = np.array(list(row["slate"]), dtype=np.int64)
                 logged_reward = float(np.sum(row["user_feedback"]))
+                logged_clicks = np.array(list(row["user_feedback"]), dtype=np.int64)
 
                 # Convert item ids → candidate indices using the cached lookup.
                 try:
@@ -107,6 +108,7 @@ class RL4RSTrajectoryOPESource:
                         obs=obs,
                         logged_action=slate_indices,
                         logged_reward=logged_reward,
+                        logged_clicks=logged_clicks,
                         propensity=propensity,
                     )
                 )

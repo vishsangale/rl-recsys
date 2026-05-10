@@ -148,17 +148,23 @@ def test_evaluate_trajectory_ope_agent_aggregates_per_trajectory() -> None:
     traj_a = [
         LoggedTrajectoryStep(
             obs=obs, logged_action=np.array([0], dtype=np.int64),
-            logged_reward=1.0, propensity=0.5,
+            logged_reward=1.0,
+            logged_clicks=np.zeros(1, dtype=np.int64),
+            propensity=0.5,
         ),
         LoggedTrajectoryStep(
             obs=obs, logged_action=np.array([0], dtype=np.int64),
-            logged_reward=0.0, propensity=0.5,
+            logged_reward=0.0,
+            logged_clicks=np.zeros(1, dtype=np.int64),
+            propensity=0.5,
         ),
     ]
     traj_b = [
         LoggedTrajectoryStep(
             obs=obs, logged_action=np.array([0], dtype=np.int64),
-            logged_reward=2.0, propensity=1.0,
+            logged_reward=2.0,
+            logged_clicks=np.zeros(1, dtype=np.int64),
+            propensity=1.0,
         ),
     ]
     source = _SyntheticTrajectorySource(trajectories=[traj_a, traj_b])
@@ -227,8 +233,8 @@ def test_evaluate_trajectory_ope_agent_uses_uniform_target_prob_for_random_agent
     #   γ=1: V = 1*(0.5*1 + 0) + 1*(0.25*0 + 0) = 0.5
     obs = _make_obs(num_candidates=4)
     traj = [
-        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0, propensity=0.5),
-        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=0.0, propensity=0.5),
+        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0, logged_clicks=np.zeros(1, dtype=np.int64), propensity=0.5),
+        LoggedTrajectoryStep(obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=0.0, logged_clicks=np.zeros(1, dtype=np.int64), propensity=0.5),
     ]
     source = _SyntheticTrajectorySource(trajectories=[traj])
     agent = RandomAgent(slate_size=1, seed=0)
@@ -249,7 +255,8 @@ def test_evaluate_trajectory_ope_agent_does_not_mutate_agent_state() -> None:
         candidate_ids=np.arange(4, dtype=np.int64),
     )
     step = LoggedTrajectoryStep(
-        obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0, propensity=0.5
+        obs=obs, logged_action=np.array([0], dtype=np.int64), logged_reward=1.0,
+        logged_clicks=np.zeros(1, dtype=np.int64), propensity=0.5
     )
     source = _SyntheticTrajectorySource(trajectories=[[step] * 5])
     agent = LinUCBAgent(slate_size=1, user_dim=4, item_dim=4, alpha=1.0)
@@ -317,7 +324,9 @@ def test_evaluate_trajectory_ope_agent_reports_ess() -> None:
     traj = [
         LoggedTrajectoryStep(
             obs=obs, logged_action=np.array([0], dtype=np.int64),
-            logged_reward=1.0, propensity=0.5,
+            logged_reward=1.0,
+            logged_clicks=np.zeros(1, dtype=np.int64),
+            propensity=0.5,
         )
         for _ in range(4)
     ]
@@ -347,6 +356,7 @@ def test_evaluate_trajectory_ope_agent_raises_when_agent_lacks_score_items() -> 
         obs=obs,
         logged_action=np.array([0], dtype=np.int64),
         logged_reward=1.0,
+        logged_clicks=np.zeros(1, dtype=np.int64),
         propensity=0.5,
     )
     source = _SyntheticTrajectorySource(trajectories=[[step]])
