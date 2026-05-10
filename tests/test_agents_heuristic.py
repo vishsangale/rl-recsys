@@ -58,3 +58,44 @@ def test_most_popular_select_slate_raises_when_slate_too_large():
     agent = MostPopularAgent(slate_size=10, num_candidates=5)
     with pytest.raises(ValueError, match="exceeds num_candidates"):
         agent.select_slate(_make_obs(num_candidates=5))
+
+
+def test_logged_replay_returns_logged_slate():
+    from rl_recsys.agents.logged_replay import LoggedReplayAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+        logged_action=np.array([4, 7, 1], dtype=np.int64),
+    )
+    agent = LoggedReplayAgent(slate_size=3)
+    np.testing.assert_array_equal(agent.select_slate(obs), [4, 7, 1])
+
+
+def test_logged_replay_raises_without_logged_action():
+    from rl_recsys.agents.logged_replay import LoggedReplayAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((10, 3)),
+        candidate_ids=np.arange(10, dtype=np.int64),
+    )
+    agent = LoggedReplayAgent(slate_size=3)
+    with pytest.raises(ValueError, match="replay-mode source"):
+        agent.select_slate(obs)
+
+
+def test_logged_replay_score_items_peaks_on_logged_slate():
+    from rl_recsys.agents.logged_replay import LoggedReplayAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.zeros((6, 3)),
+        candidate_ids=np.arange(6, dtype=np.int64),
+        logged_action=np.array([2, 4], dtype=np.int64),
+    )
+    agent = LoggedReplayAgent(slate_size=2)
+    scores = agent.score_items(obs)
+    assert scores.shape == (6,)
+    assert scores[2] > scores[0] and scores[4] > scores[0]
