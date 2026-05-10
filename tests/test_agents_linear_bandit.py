@@ -110,3 +110,40 @@ def test_eps_greedy_exploits_at_eps_zero():
     scores = agent.score_items(obs)
     expected_top3 = set(np.argsort(scores)[-3:].tolist())
     assert set(agent.select_slate(obs).tolist()) == expected_top3
+
+
+def test_boltzmann_collapses_to_argmax_at_low_T():
+    from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
+
+    obs = RecObs(
+        user_features=np.array([1.0, 0, 0, 0]),
+        candidate_features=np.eye(8, 3),
+        candidate_ids=np.arange(8, dtype=np.int64),
+    )
+    agent = BoltzmannLinearAgent(
+        slate_size=3, user_dim=4, item_dim=3,
+        temperature=1e-4, rng=np.random.default_rng(0),
+    )
+    # Inject a non-uniform b vector so theta != 0; otherwise scores are
+    # all-zero and Gumbel noise (not the temperature) decides the slate.
+    agent._b_vector = np.arange(agent._feature_dim, dtype=np.float64)
+    scores = agent.score_items(obs)
+    top3 = set(np.argsort(scores)[-3:].tolist())
+    assert set(agent.select_slate(obs).tolist()) == top3
+
+
+def test_boltzmann_select_slate_returns_unique_indices():
+    from rl_recsys.agents.boltzmann_linear import BoltzmannLinearAgent
+
+    obs = RecObs(
+        user_features=np.zeros(4),
+        candidate_features=np.eye(20, 3),
+        candidate_ids=np.arange(20, dtype=np.int64),
+    )
+    agent = BoltzmannLinearAgent(
+        slate_size=5, user_dim=4, item_dim=3,
+        temperature=1.0, rng=np.random.default_rng(0),
+    )
+    for _ in range(5):
+        slate = agent.select_slate(obs)
+        assert len(set(slate.tolist())) == 5
