@@ -154,3 +154,71 @@ def test_fit_behavior_policy_with_calibration_raises_on_bad_nll(
             parquet, user_dim=2, item_dim=2, slate_size=1, num_items=3,
             epochs=1, batch_size=8, seed=0, nll_threshold=0.01,
         )
+
+
+def test_slate_log_propensities_batch_matches_per_call() -> None:
+    """Batched log-propensities match per-row slate_propensity calls."""
+    rng = np.random.default_rng(0)
+    user_dim, item_dim, slate_size, num_items = 3, 4, 2, 5
+    model = BehaviorPolicy(
+        user_dim=user_dim, item_dim=item_dim, slate_size=slate_size,
+        num_items=num_items, hidden_dim=8, seed=0, device="cpu",
+    )
+
+    n = 6
+    users = rng.standard_normal((n, user_dim)).astype(np.float64)
+    candidate_features = rng.standard_normal((num_items, item_dim)).astype(np.float64)
+    slates = np.stack([rng.choice(num_items, size=slate_size, replace=False)
+                       for _ in range(n)]).astype(np.int64)
+
+    log_props = model.slate_log_propensities_batch(
+        users, slates, candidate_features,
+    )
+    per_call = np.array([
+        model.slate_propensity(users[i], candidate_features, slates[i])
+        for i in range(n)
+    ])
+
+    assert log_props.shape == (n,)
+    np.testing.assert_allclose(np.exp(log_props), per_call, atol=1e-12)
+
+
+def test_slate_log_propensities_batch_chunking_is_consistent() -> None:
+    """Same inputs, different batch_size -> identical output."""
+    rng = np.random.default_rng(1)
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=4,
+        hidden_dim=4, seed=0, device="cpu",
+    )
+    n = 7
+    users = rng.standard_normal((n, 2)).astype(np.float64)
+    cand = rng.standard_normal((4, 2)).astype(np.float64)
+    slates = np.stack([rng.choice(4, size=2, replace=False)
+                       for _ in range(n)]).astype(np.int64)
+
+    a = model.slate_log_propensities_batch(users, slates, cand, batch_size=2)
+    b = model.slate_log_propensities_batch(users, slates, cand, batch_size=64)
+    np.testing.assert_allclose(a, b, atol=1e-12)
+
+
+def test_slate_log_propensities_batch_validates_shapes() -> None:
+    """Mismatched B and bad slate width raise ValueError."""
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0, device="cpu",
+    )
+    cand = np.zeros((3, 2), dtype=np.float64)
+
+    with pytest.raises(ValueError, match="batch size mismatch"):
+        model.slate_log_propensities_batch(
+            np.zeros((4, 2), dtype=np.float64),
+            np.zeros((5, 2), dtype=np.int64),
+            cand,
+        )
+
+    with pytest.raises(ValueError, match="slate width"):
+        model.slate_log_propensities_batch(
+            np.zeros((3, 2), dtype=np.float64),
+            np.zeros((3, 5), dtype=np.int64),
+            cand,
+        )

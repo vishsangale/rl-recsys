@@ -101,6 +101,67 @@ class BehaviorPolicy(nn.Module):
             raise ValueError("zero propensity in logged slate")
         return result
 
+    def slate_log_propensities_batch(
+        self,
+        users: np.ndarray,
+        slates: np.ndarray,
+        candidate_features: np.ndarray,
+        *,
+        batch_size: int = 512,
+    ) -> np.ndarray:
+        """log Π_k softmax(score(·, k))[slate[k]] for each (user, slate) pair.
+
+        Returns numpy array of shape (B,). Iterates in chunks of `batch_size`;
+        each chunk runs `slate_size` calls to `_score_batch` (one per position),
+        log-softmax, and gathers at the logged candidate index.
+
+        Raises ValueError if `users.shape[0] != slates.shape[0]` or
+        `slates.shape[1] != self._slate_size`.
+        """
+        if users.shape[0] != slates.shape[0]:
+            raise ValueError(
+                f"batch size mismatch: users={users.shape[0]} slates={slates.shape[0]}"
+            )
+        if slates.shape[1] != self._slate_size:
+            raise ValueError(
+                f"slate width {slates.shape[1]} != self._slate_size {self._slate_size}"
+            )
+
+        n = users.shape[0]
+        cand_t = torch.as_tensor(
+            candidate_features, dtype=torch.float64, device=self._device,
+        )
+        out = np.empty(n, dtype=np.float64)
+
+        with torch.no_grad():
+            for start in range(0, n, batch_size):
+                end = min(start + batch_size, n)
+                b = end - start
+
+                users_chunk = torch.as_tensor(
+                    users[start:end], dtype=torch.float64, device=self._device,
+                )
+                slates_chunk = torch.as_tensor(
+                    slates[start:end], dtype=torch.long, device=self._device,
+                )
+                cands_b = cand_t.unsqueeze(0).expand(b, -1, -1)
+
+                log_total = torch.zeros(b, dtype=torch.float64, device=self._device)
+                for k in range(self._slate_size):
+                    positions = torch.full(
+                        (b,), k, dtype=torch.long, device=self._device,
+                    )
+                    logits = self._score_batch(users_chunk, cands_b, positions)
+                    log_probs = torch.log_softmax(logits, dim=-1)
+                    gathered = log_probs.gather(
+                        1, slates_chunk[:, k:k + 1],
+                    ).squeeze(1)
+                    log_total = log_total + gathered
+
+                out[start:end] = log_total.cpu().numpy()
+
+        return out
+
 
 def _build_universe_from_df(df) -> tuple[np.ndarray, np.ndarray, dict[int, int]]:
     """Build sorted candidate universe from slate + item_features columns.
