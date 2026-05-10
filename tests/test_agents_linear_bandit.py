@@ -45,3 +45,34 @@ def test_linear_base_features_validate_shape():
     a = _DummyLinear(slate_size=3, user_dim=4, item_dim=3)
     with pytest.raises(ValueError, match="user_features shape"):
         a.score_items(bad_obs)
+
+
+def test_lints_sample_is_deterministic_with_rng():
+    from rl_recsys.agents.lin_ts import LinTSAgent
+
+    obs = RecObs(
+        user_features=np.array([1.0, 0.0, 0.0, 0.0]),
+        candidate_features=np.eye(5, 3),
+        candidate_ids=np.arange(5, dtype=np.int64),
+    )
+    a = LinTSAgent(
+        slate_size=2, user_dim=4, item_dim=3,
+        sigma=1.0, rng=np.random.default_rng(0),
+    )
+    b = LinTSAgent(
+        slate_size=2, user_dim=4, item_dim=3,
+        sigma=1.0, rng=np.random.default_rng(0),
+    )
+    np.testing.assert_array_equal(a.select_slate(obs), b.select_slate(obs))
+
+
+def test_lints_score_shape_matches_num_candidates():
+    from rl_recsys.agents.lin_ts import LinTSAgent
+
+    obs = RecObs(
+        user_features=np.array([1.0, 0.0, 0.0, 0.0]),
+        candidate_features=np.eye(7, 3),
+        candidate_ids=np.arange(7, dtype=np.int64),
+    )
+    agent = LinTSAgent(slate_size=3, user_dim=4, item_dim=3)
+    assert agent.score_items(obs).shape == (7,)
