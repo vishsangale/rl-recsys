@@ -159,7 +159,10 @@ else:
 ```
 
 `iter_trajectories` is rewritten to walk `self._ordered` (already
-filtered + sorted), group by `session_id`, and per row index `i`:
+filtered + sorted), group by `session_id`. After `reset_index(drop=True)`,
+each group's `.index` values are positions in `self._ordered` and
+therefore valid lookups into `self._propensities`. Per row at
+position `i`:
 
 - `user_features = np.array(list(self._ordered.at[i, "user_state"]), …)`
 - `logged_slate_ids = np.array(list(self._ordered.at[i, "slate"]), …)`
