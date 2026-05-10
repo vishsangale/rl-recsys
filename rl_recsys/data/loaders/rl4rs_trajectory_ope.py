@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import Iterator
 
 import numpy as np
@@ -65,25 +66,59 @@ class RL4RSTrajectoryOPESource:
             int(cid): k for k, cid in enumerate(universe)
         }
 
+        # Sort + filter once. Row-positions in self._ordered are the indices
+        # into self._propensities.
+        ordered = self._df.sort_values(
+            ["session_id", "sequence_id"], kind="stable",
+        )
+        if self._session_filter is not None:
+            ordered = ordered[ordered["session_id"].isin(self._session_filter)]
+        self._ordered = ordered.reset_index(drop=True)
+
+        # Precompute propensities for every row in self._ordered in one batched
+        # pass. Empty filter → zero-length _propensities; iter_trajectories
+        # raises on iteration as before.
+        if len(self._ordered) > 0:
+            users = np.stack([
+                np.array(list(u), dtype=np.float64)
+                for u in self._ordered["user_state"]
+            ])
+            slate_indices = np.stack([
+                np.array(
+                    [self._cand_id_to_idx[int(x)] for x in s], dtype=np.int64,
+                )
+                for s in self._ordered["slate"]
+            ])
+            started = perf_counter()
+            log_props = self._policy.slate_log_propensities_batch(
+                users, slate_indices, self._candidate_features,
+            )
+            self._propensities = np.exp(log_props).astype(np.float64)
+            elapsed = perf_counter() - started
+            print(
+                f"propensity precompute: {len(self._propensities)} rows "
+                f"in {elapsed:.1f}s",
+                flush=True,
+            )
+            if (self._propensities <= 0).any():
+                raise ValueError("zero propensity in logged slate")
+        else:
+            self._propensities = np.zeros(0, dtype=np.float64)
+
     def iter_trajectories(
-        self, *, max_trajectories: int | None = None, seed: int | None = None
+        self, *, max_trajectories: int | None = None, seed: int | None = None,
     ) -> Iterator[list[LoggedTrajectoryStep]]:
-        ordered = self._df.sort_values(["session_id", "sequence_id"], kind="stable")
-        groups = ordered.groupby("session_id", sort=False)
+        groups = self._ordered.groupby("session_id", sort=False)
         session_ids = list(groups.groups.keys())
         rng = np.random.default_rng(0 if seed is None else seed)
         if seed is not None:
             rng.shuffle(session_ids)
 
-        if self._session_filter is not None:
-            session_ids = [
-                sid for sid in session_ids if int(sid) in self._session_filter
-            ]
-            if not session_ids:
-                raise ValueError(
-                    "session_filter excludes every session in the parquet — "
-                    "no trajectories to emit"
-                )
+        if not session_ids:
+            raise ValueError(
+                "session_filter excludes every session in the parquet — "
+                "no trajectories to emit"
+            )
 
         emitted = 0
         for sid in session_ids:
@@ -91,13 +126,14 @@ class RL4RSTrajectoryOPESource:
                 break
             group = groups.get_group(sid)
             steps: list[LoggedTrajectoryStep] = []
-            for _, row in group.iterrows():
-                user_features = np.array(list(row["user_state"]), dtype=np.float64)
-                logged_slate_ids = np.array(list(row["slate"]), dtype=np.int64)
-                logged_reward = float(np.sum(row["user_feedback"]))
-                logged_clicks = np.array(list(row["user_feedback"]), dtype=np.int64)
+            for row_pos, row in zip(group.index, group.itertuples(index=False)):
+                user_features = np.array(list(row.user_state), dtype=np.float64)
+                logged_slate_ids = np.array(list(row.slate), dtype=np.int64)
+                logged_reward = float(np.sum(row.user_feedback))
+                logged_clicks = np.array(
+                    list(row.user_feedback), dtype=np.int64,
+                )
 
-                # Convert item ids → candidate indices using the cached lookup.
                 try:
                     slate_indices = np.array(
                         [self._cand_id_to_idx[int(x)] for x in logged_slate_ids],
@@ -109,9 +145,7 @@ class RL4RSTrajectoryOPESource:
                         f"candidate universe — {exc}"
                     ) from exc
 
-                propensity = self._policy.slate_propensity(
-                    user_features, self._candidate_features, slate_indices,
-                )
+                propensity = float(self._propensities[row_pos])
                 obs = RecObs(
                     user_features=user_features,
                     candidate_features=self._candidate_features,

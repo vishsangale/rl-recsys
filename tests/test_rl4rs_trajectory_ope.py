@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from rl_recsys.evaluation.behavior_policy import BehaviorPolicy
 from rl_recsys.evaluation.ope_trajectory import LoggedTrajectoryStep
@@ -166,7 +167,6 @@ def test_loader_empty_session_filter_raises_on_iter(tmp_path: Path) -> None:
     from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
         RL4RSTrajectoryOPESource,
     )
-    import pytest
     parquet = _fixture_b_parquet(tmp_path)
     model = BehaviorPolicy(
         user_dim=2, item_dim=2, slate_size=2, num_items=3,
@@ -249,3 +249,29 @@ def test_pretrained_linucb_diverges_from_fresh_linucb(tmp_path: Path) -> None:
         abs(fresh_result.avg_seq_dr_value - pretrained_result.avg_seq_dr_value)
         > 1e-6
     )
+
+
+def test_loader_propensity_matches_per_call(tmp_path: Path) -> None:
+    """Loader's batched propensities match per-row slate_propensity calls."""
+    from rl_recsys.data.loaders.rl4rs_trajectory_ope import (
+        RL4RSTrajectoryOPESource,
+    )
+    parquet = _fixture_b_parquet(tmp_path)
+
+    model = BehaviorPolicy(
+        user_dim=2, item_dim=2, slate_size=2, num_items=3,
+        hidden_dim=4, seed=0, device="cpu",
+    )
+    source = RL4RSTrajectoryOPESource(
+        parquet_path=parquet, behavior_policy=model, slate_size=2,
+    )
+    trajectories = list(source.iter_trajectories(max_trajectories=10, seed=0))
+
+    for traj in trajectories:
+        for step in traj:
+            expected = model.slate_propensity(
+                step.obs.user_features,
+                source._candidate_features,
+                step.logged_action,
+            )
+            assert step.propensity == pytest.approx(expected, rel=1e-12, abs=1e-12)
